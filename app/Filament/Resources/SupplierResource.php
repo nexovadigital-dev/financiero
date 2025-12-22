@@ -6,6 +6,7 @@ use App\Filament\Resources\SupplierResource\Pages;
 use App\Models\Supplier;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -68,9 +69,22 @@ class SupplierResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make()
+                    ->before(function (Tables\Actions\DeleteAction $action, Supplier $record) {
+                        // Verificar si el proveedor tiene pagos asociados
+                        if ($record->expenses()->count() > 0) {
+                            Notification::make()
+                                ->danger()
+                                ->title('No se puede eliminar')
+                                ->body('Este proveedor tiene pagos registrados. No es posible eliminarlo.')
+                                ->persistent()
+                                ->send();
+
+                            $action->cancel();
+                        }
+                    })
                     ->requiresConfirmation()
                     ->modalHeading('Eliminar Proveedor')
-                    ->modalDescription('¿Está seguro que desea eliminar este proveedor? También se eliminarán todos los pagos asociados.')
+                    ->modalDescription('¿Está seguro que desea eliminar este proveedor? Esta acción no se puede deshacer.')
                     ->modalSubmitActionLabel('Sí, eliminar'),
             ])
             ->bulkActions([

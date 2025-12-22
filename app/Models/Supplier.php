@@ -13,4 +13,9 @@ class Supplier extends Model
         'name',
         'website',
     ];
+
+    public function expenses()
+    {
+        return $this->hasMany(Expense::class);
+    }
 }

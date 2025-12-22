@@ -6,6 +6,7 @@ use App\Filament\Resources\ClientResource\Pages;
 use App\Models\Client;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -93,6 +94,19 @@ class ClientResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make()
+                    ->before(function (Tables\Actions\DeleteAction $action, Client $record) {
+                        // Verificar si el cliente tiene ventas asociadas
+                        if ($record->sales()->count() > 0) {
+                            Notification::make()
+                                ->danger()
+                                ->title('No se puede eliminar')
+                                ->body('Este cliente tiene ventas registradas. No es posible eliminarlo.')
+                                ->persistent()
+                                ->send();
+
+                            $action->cancel();
+                        }
+                    })
                     ->requiresConfirmation()
                     ->modalHeading('Eliminar Cliente')
                     ->modalDescription('¿Está seguro que desea eliminar este cliente? Esta acción no se puede deshacer.')

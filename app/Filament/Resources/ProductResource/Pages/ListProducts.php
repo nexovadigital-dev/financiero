@@ -30,8 +30,8 @@ class ListProducts extends ListRecords
                     ->icon('heroicon-o-shopping-bag')
                     ->color('info')
                     ->requiresConfirmation()
-                    ->modalHeading('Sincronizar WooCommerce')
-                    ->modalDescription('Se descargarán productos y variantes. Los productos que ya no existan en la tienda se eliminarán de esta lista (sin afectar historial).')
+                    ->modalHeading('Sincronizar WooCommerce (SOLO LECTURA)')
+                    ->modalDescription('⚠️ MODO SOLO LECTURA: Se descargarán productos y variantes desde WooCommerce. Esta operación NO modificará ni eliminará NADA en tu tienda WooCommerce. Solo actualiza la lista local.')
                     ->action(fn () => $this->syncWooCommerce()),
 
                 // 2. SINCRONIZAR DHRU FUSION
@@ -54,17 +54,17 @@ class ListProducts extends ListRecords
     // --- LÓGICA WOOCOMMERCE ---
     public function syncWooCommerce()
     {
-        if (!env('WOO_URL') || !env('WOO_KEY')) {
-            $this->notifyError('Faltan credenciales WOO en .env');
+        if (!env('WOOCOMMERCE_URL') || !env('WOOCOMMERCE_CONSUMER_KEY') || !env('WOOCOMMERCE_CONSUMER_SECRET')) {
+            $this->notifyError('Faltan credenciales WOOCOMMERCE en .env (WOOCOMMERCE_URL, WOOCOMMERCE_CONSUMER_KEY, WOOCOMMERCE_CONSUMER_SECRET)');
             return;
         }
 
         try {
             $woocommerce = new Client(
-                env('WOO_URL'),
-                env('WOO_KEY'),
-                env('WOO_SECRET'),
-                ['version' => 'wc/v3', 'verify_ssl' => false, 'timeout' => 60]
+                env('WOOCOMMERCE_URL'),
+                env('WOOCOMMERCE_CONSUMER_KEY'),
+                env('WOOCOMMERCE_CONSUMER_SECRET'),
+                ['version' => 'wc/v3', 'verify_ssl' => true, 'timeout' => 60]
             );
 
             // Traemos 100 productos (puedes aumentar si necesitas más paginación)
