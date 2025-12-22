@@ -19,6 +19,25 @@ class ProductResource extends Resource
     protected static ?string $modelLabel = 'Producto/Servicio';
     protected static ?string $navigationGroup = 'Gestión';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['name', 'sku'];
+    }
+
+    public static function getGlobalSearchResultTitle($record): string
+    {
+        return $record->name;
+    }
+
+    public static function getGlobalSearchResultDetails($record): array
+    {
+        $details = ['Precio' => '$' . number_format($record->price, 2)];
+        if ($record->sku) {
+            $details['SKU'] = $record->sku;
+        }
+        return $details;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

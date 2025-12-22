@@ -22,6 +22,24 @@ class SaleResource extends Resource
     protected static ?string $modelLabel = 'Venta';
     protected static ?string $navigationGroup = 'Gestión';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['id', 'client.name'];
+    }
+
+    public static function getGlobalSearchResultTitle($record): string
+    {
+        return 'Venta #' . $record->id . ' - ' . $record->client->name;
+    }
+
+    public static function getGlobalSearchResultDetails($record): array
+    {
+        return [
+            'Total' => '$' . number_format($record->total_amount, 2),
+            'Fecha' => $record->sale_date->format('d/m/Y'),
+        ];
+    }
+
     public static function form(Form $form): Form
     {
         return $form

@@ -19,6 +19,24 @@ class ClientResource extends Resource
     protected static ?string $modelLabel = 'Cliente';
     protected static ?string $navigationGroup = 'Gestión';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['name', 'email', 'phone'];
+    }
+
+    public static function getGlobalSearchResultTitle($record): string
+    {
+        return $record->name;
+    }
+
+    public static function getGlobalSearchResultDetails($record): array
+    {
+        return [
+            'Email' => $record->email,
+            'Teléfono' => $record->phone,
+        ];
+    }
+
     public static function form(Form $form): Form
     {
         return $form
