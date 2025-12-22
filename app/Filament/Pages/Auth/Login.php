@@ -10,12 +10,12 @@ class Login extends BaseLogin
 {
     public function getHeading(): string
     {
-        return 'NicaGSM - Sistema Financiero';
+        return 'Acceso Administrador';
     }
 
     public function getSubHeading(): string
     {
-        return 'Gestión Profesional de Ventas y Finanzas';
+        return '⚠️ SISTEMA PRIVADO - Acceso Restringido';
     }
 
     protected function getForms(): array

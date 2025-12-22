@@ -25,9 +25,21 @@ class AdminPanelProvider extends PanelProvider
 {
     public function boot(): void
     {
+        // CSS Personalizado
         FilamentView::registerRenderHook(
             PanelsRenderHook::HEAD_END,
             fn (): string => Blade::render('<link rel="stylesheet" href="{{ asset(\'css/filament-custom.css\') }}">')
+        );
+
+        // Meta tags para prevenir indexación en buscadores
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::HEAD_START,
+            fn (): string => Blade::render('
+                <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+                <meta name="googlebot" content="noindex, nofollow">
+                <meta name="bingbot" content="noindex, nofollow">
+                <meta name="description" content="Sistema de administración privado">
+            ')
         );
     }
 
@@ -59,6 +71,9 @@ class AdminPanelProvider extends PanelProvider
 
             // OPCIONAL: Si quieres el menú superior de navegación desactivado para forzar todo al lateral
             ->topNavigation(false)
+
+            // PERFIL DE USUARIO - Habilitar edición de perfil
+            ->profile(\App\Filament\Pages\Auth\EditProfile::class)
 
             // COMPONENTES
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
