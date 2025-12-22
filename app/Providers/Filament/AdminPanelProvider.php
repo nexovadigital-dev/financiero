@@ -38,13 +38,16 @@ class AdminPanelProvider extends PanelProvider
             // UI / UX
             ->spa()
             ->font('Poppins')
-            
+
             // MENÚ LATERAL FIJO (Sin opción de colapsar)
-            ->sidebarFullyCollapsibleOnDesktop(false) 
+            ->sidebarFullyCollapsibleOnDesktop(false)
             ->sidebarCollapsibleOnDesktop(false) // Esto asegura que siempre esté abierto
-            
-             // OPCIONAL: Si quieres el menú superior de navegación desactivado para forzar todo al lateral
+
+            // OPCIONAL: Si quieres el menú superior de navegación desactivado para forzar todo al lateral
             ->topNavigation(false)
+
+            // CSS Personalizado (barra de carga gruesa y animaciones)
+            ->stylesheet(asset('css/filament-custom.css'))
 
             // COMPONENTES
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
