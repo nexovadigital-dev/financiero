@@ -18,11 +18,18 @@ class Sale extends Model
         'total_amount',
         'currency',
         'notes',
+        'amount_usd',
+        'exchange_rate_used',
+        'manually_converted',
+        'payment_reference',
     ];
 
     protected $casts = [
         'sale_date' => 'datetime',
         'total_amount' => 'decimal:2',
+        'amount_usd' => 'decimal:2',
+        'exchange_rate_used' => 'decimal:6',
+        'manually_converted' => 'boolean',
     ];
 
     // Relaciones
