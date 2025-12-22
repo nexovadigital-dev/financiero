@@ -118,3 +118,220 @@
     height: 24px !important;
     border-width: 3px !important;
 }
+
+/* ==================================
+   CORRECCIONES DE LAYOUT Y Z-INDEX
+   ================================== */
+
+/* Asegurar que formularios tengan z-index correcto */
+.fi-fo {
+    position: relative;
+    z-index: 10 !important;
+}
+
+/* Widgets deben estar debajo de los formularios */
+.fi-wi {
+    position: relative;
+    z-index: 5 !important;
+}
+
+/* Secciones de filtros con margen inferior adecuado */
+.fi-fo-section {
+    margin-bottom: 2rem !important;
+}
+
+/* Selectores y campos de formulario */
+.fi-fo-field-wrp {
+    position: relative;
+    z-index: 20 !important;
+}
+
+/* Dropdowns de select deben tener z-index alto */
+.fi-fo-field-wrp select,
+.fi-select-button {
+    position: relative;
+    z-index: 30 !important;
+}
+
+/* Menús desplegables de Filament */
+[x-data*="select"] ul,
+.fi-dropdown-panel,
+.choices__list--dropdown {
+    z-index: 9999 !important;
+}
+
+/* ==================================
+   NOTIFICACIONES CON BARRA DE PROGRESO
+   ================================== */
+
+/* Contenedor de notificaciones */
+.fi-no {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Barra de progreso animada para toasts */
+.fi-no::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 4px;
+    width: 100%;
+    background: linear-gradient(90deg, #7cbd2b 0%, #6ab028 100%);
+    transform-origin: left;
+    animation: notificationProgress 4s linear forwards;
+}
+
+/* Notificaciones de éxito */
+.fi-no-color-success::after {
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+}
+
+/* Notificaciones de error */
+.fi-no-color-danger::after {
+    background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+}
+
+/* Notificaciones de advertencia */
+.fi-no-color-warning::after {
+    background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+}
+
+/* Notificaciones de info */
+.fi-no-color-info::after {
+    background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+}
+
+/* Animación de la barra de progreso */
+@keyframes notificationProgress {
+    0% {
+        transform: scaleX(0);
+    }
+    100% {
+        transform: scaleX(1);
+    }
+}
+
+/* Efecto de desvanecimiento al final */
+@keyframes fadeOutNotification {
+    0% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
+
+/* Aplicar desvanecimiento después de 4s */
+.fi-no {
+    animation: fadeOutNotification 0.3s ease-out 3.7s forwards;
+}
+
+/* Efecto de entrada suave */
+@keyframes slideInNotification {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.fi-no {
+    animation: slideInNotification 0.3s ease-out, fadeOutNotification 0.3s ease-out 3.7s forwards;
+}
+
+/* ==================================
+   MEJORAS VISUALES GENERALES
+   ================================== */
+
+/* Espaciado entre widgets */
+.fi-wi {
+    margin-bottom: 1.5rem;
+}
+
+/* Tablas más limpias */
+.fi-ta-table {
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+/* Hover en filas de tabla */
+.fi-ta-row:hover {
+    background-color: rgba(124, 189, 43, 0.05) !important;
+    transition: background-color 0.2s ease;
+}
+
+/* Badges más modernos */
+.fi-badge {
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    transition: all 0.2s ease;
+}
+
+.fi-badge:hover {
+    transform: scale(1.05);
+}
+
+/* Botones con mejor feedback */
+.fi-btn {
+    transition: all 0.2s ease;
+}
+
+.fi-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.fi-btn:active {
+    transform: translateY(0);
+}
+
+/* Inputs con mejor focus */
+.fi-input:focus {
+    ring-color: #7cbd2b !important;
+    border-color: #7cbd2b !important;
+    box-shadow: 0 0 0 3px rgba(124, 189, 43, 0.1) !important;
+}
+
+/* Selectores con mejor estilo */
+.fi-select-button:focus {
+    ring-color: #7cbd2b !important;
+    border-color: #7cbd2b !important;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #7cbd2b;
+}
+
+/* Modales más atractivos */
+.fi-modal {
+    backdrop-filter: blur(4px);
+}
+
+.fi-modal-content {
+    animation: scaleIn 0.3s ease-out;
+}
+
