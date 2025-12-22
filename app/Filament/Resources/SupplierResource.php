@@ -29,15 +29,20 @@ class SupplierResource extends Resource
                         Forms\Components\TextInput::make('name')
                             ->label('Nombre del Proveedor')
                             ->required()
+                            ->minLength(2)
                             ->maxLength(255)
-                            ->columnSpanFull(), // Ocupa todo el ancho
+                            ->placeholder('Ingrese el nombre del proveedor')
+                            ->columnSpanFull(),
 
                         Forms\Components\TextInput::make('website')
                             ->label('Sitio Web')
-                            ->url() // Valida que sea una URL válida
+                            ->url()
                             ->suffixIcon('heroicon-m-globe-alt')
                             ->placeholder('https://ejemplo.com')
                             ->maxLength(255)
+                            ->validationMessages([
+                                'url' => 'Debe ingresar una URL válida (ejemplo: https://google.com)',
+                            ])
                             ->columnSpanFull(),
                     ])->columns(1), // Una sola columna para que se vea limpio
             ]);
@@ -62,7 +67,20 @@ class SupplierResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->requiresConfirmation()
+                    ->modalHeading('Eliminar Proveedor')
+                    ->modalDescription('¿Está seguro que desea eliminar este proveedor? También se eliminarán todos los pagos asociados.')
+                    ->modalSubmitActionLabel('Sí, eliminar'),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->requiresConfirmation()
+                        ->modalHeading('Eliminar Proveedores Seleccionados')
+                        ->modalDescription('¿Está seguro que desea eliminar los proveedores seleccionados? También se eliminarán todos los pagos asociados.')
+                        ->modalSubmitActionLabel('Sí, eliminar todos'),
+                ]),
             ]);
     }
 

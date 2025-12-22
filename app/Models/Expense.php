@@ -8,7 +8,15 @@ use Illuminate\Database\Eloquent\Model;
 class Expense extends Model
 {
     use HasFactory;
-    protected $guarded = [];
+
+    protected $fillable = [
+        'supplier_id',
+        'payment_method_id',
+        'amount',
+        'currency',
+        'payment_date',
+        'description',
+    ];
 
     protected $casts = [
         'payment_date' => 'date',

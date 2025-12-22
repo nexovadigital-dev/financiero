@@ -28,30 +28,41 @@ class ProductResource extends Resource
                         Forms\Components\TextInput::make('name')
                             ->label('Nombre del Artículo / Servicio')
                             ->required()
+                            ->minLength(3)
+                            ->maxLength(255)
+                            ->placeholder('Ejemplo: VPS Cloud 2GB RAM')
                             ->columnSpanFull(),
-                        
+
                         Forms\Components\Grid::make(3)
                             ->schema([
                                 Forms\Components\TextInput::make('price')
                                     ->label('Precio Venta')
                                     ->numeric()
                                     ->prefix('$')
-                                    ->required(),
-                                    
+                                    ->required()
+                                    ->minValue(0.01)
+                                    ->step(0.01)
+                                    ->placeholder('0.00')
+                                    ->validationMessages([
+                                        'min' => 'El precio debe ser mayor a 0.',
+                                    ]),
+
                                 Forms\Components\Select::make('type')
                                     ->label('Tipo')
                                     ->options([
-                                        'digital_product' => 'Artículo Tienda', // Mapeado para WooCommerce
+                                        'digital_product' => 'Artículo Tienda',
                                         'service' => 'Servicio Servidor',
                                         'server_credit' => 'Crédito Servidor',
                                     ])
                                     ->default('digital_product')
-                                    ->required(),
+                                    ->required()
+                                    ->native(false),
 
                                 Forms\Components\TextInput::make('sku')
                                     ->label('SKU (Código)')
                                     ->placeholder('Sincronizable con Tienda')
-                                    ->maxLength(255),
+                                    ->maxLength(255)
+                                    ->alphaDash(),
                             ]),
                             
                         Forms\Components\Toggle::make('is_active')
@@ -111,7 +122,20 @@ class ProductResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->requiresConfirmation()
+                    ->modalHeading('Eliminar Producto/Servicio')
+                    ->modalDescription('¿Está seguro que desea eliminar este producto/servicio?')
+                    ->modalSubmitActionLabel('Sí, eliminar'),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->requiresConfirmation()
+                        ->modalHeading('Eliminar Productos/Servicios')
+                        ->modalDescription('¿Está seguro que desea eliminar los productos/servicios seleccionados?')
+                        ->modalSubmitActionLabel('Sí, eliminar todos'),
+                ]),
             ]);
     }
 

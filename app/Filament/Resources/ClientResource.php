@@ -28,17 +28,25 @@ class ClientResource extends Resource
                         Forms\Components\TextInput::make('name')
                             ->label('Nombre Completo')
                             ->required()
-                            ->maxLength(255),
-                            
+                            ->minLength(3)
+                            ->maxLength(255)
+                            ->placeholder('Ingrese el nombre completo del cliente'),
+
                         Forms\Components\TextInput::make('email')
                             ->email()
                             ->label('Correo Electrónico')
-                            ->maxLength(255),
-                            
+                            ->maxLength(255)
+                            ->placeholder('cliente@ejemplo.com')
+                            ->unique(ignoreRecord: true)
+                            ->validationMessages([
+                                'unique' => 'Este correo ya está registrado.',
+                            ]),
+
                         Forms\Components\TextInput::make('phone')
                             ->tel()
                             ->label('Teléfono')
-                            ->maxLength(20),
+                            ->maxLength(20)
+                            ->placeholder('8888-8888'),
                     ])->columns(2),
             ]);
     }
@@ -66,11 +74,19 @@ class ClientResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->requiresConfirmation()
+                    ->modalHeading('Eliminar Cliente')
+                    ->modalDescription('¿Está seguro que desea eliminar este cliente? Esta acción no se puede deshacer.')
+                    ->modalSubmitActionLabel('Sí, eliminar'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->requiresConfirmation()
+                        ->modalHeading('Eliminar Clientes Seleccionados')
+                        ->modalDescription('¿Está seguro que desea eliminar los clientes seleccionados? Esta acción no se puede deshacer.')
+                        ->modalSubmitActionLabel('Sí, eliminar todos'),
                 ]),
             ]);
     }

@@ -53,22 +53,33 @@ class ExpenseResource extends Resource
                                     ->label('Monto Pagado')
                                     ->numeric()
                                     ->prefix('$')
-                                    ->required(),
-                                
+                                    ->required()
+                                    ->minValue(0.01)
+                                    ->step(0.01)
+                                    ->placeholder('0.00')
+                                    ->validationMessages([
+                                        'min' => 'El monto debe ser mayor a 0.',
+                                    ]),
+
                                 Forms\Components\Select::make('currency')
                                     ->label('Moneda')
                                     ->options(['USD' => 'USD', 'NIO' => 'NIO'])
                                     ->default('USD')
-                                    ->required(),
+                                    ->required()
+                                    ->native(false),
                             ]),
 
                         Forms\Components\Select::make('payment_method_id')
                             ->label('Método de Pago')
                             ->relationship('paymentMethod', 'name')
-                            ->required(),
+                            ->required()
+                            ->native(false),
 
                         Forms\Components\Textarea::make('description')
                             ->label('Concepto / Detalle')
+                            ->placeholder('Describe el motivo del pago...')
+                            ->rows(3)
+                            ->maxLength(1000)
                             ->columnSpanFull(),
                     ])->columns(2),
             ]);
@@ -110,7 +121,20 @@ class ExpenseResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->requiresConfirmation()
+                    ->modalHeading('Eliminar Pago')
+                    ->modalDescription('¿Está seguro que desea eliminar este pago? Esta acción no se puede deshacer.')
+                    ->modalSubmitActionLabel('Sí, eliminar'),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->requiresConfirmation()
+                        ->modalHeading('Eliminar Pagos Seleccionados')
+                        ->modalDescription('¿Está seguro que desea eliminar los pagos seleccionados? Esta acción no se puede deshacer.')
+                        ->modalSubmitActionLabel('Sí, eliminar todos'),
+                ]),
             ]);
     }
 
