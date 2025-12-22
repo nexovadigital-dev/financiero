@@ -1,0 +1,225 @@
+<?php
+
+namespace App\Filament\Resources\ProductResource\Pages;
+
+use App\Filament\Resources\ProductResource;
+use App\Models\Product;
+use Filament\Actions;
+use Filament\Resources\Pages\ListRecords;
+use Automattic\WooCommerce\Client;
+use Filament\Notifications\Notification;
+use Filament\Support\Enums\MaxWidth;
+use Illuminate\Support\Facades\Http;
+
+class ListProducts extends ListRecords
+{
+    protected static string $resource = ProductResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\CreateAction::make()
+                ->label('Crear Nuevo'),
+
+            // GRUPO DE ACCIONES DE SINCRONIZACIÓN
+            Actions\ActionGroup::make([
+                
+                // 1. SINCRONIZAR WOOCOMMERCE
+                Actions\Action::make('syncWoo')
+                    ->label('Sincronizar Tienda (Woo)')
+                    ->icon('heroicon-o-shopping-bag')
+                    ->color('info')
+                    ->requiresConfirmation()
+                    ->modalHeading('Sincronizar WooCommerce')
+                    ->modalDescription('Se descargarán productos y variantes. Los productos que ya no existan en la tienda se eliminarán de esta lista (sin afectar historial).')
+                    ->action(fn () => $this->syncWooCommerce()),
+
+                // 2. SINCRONIZAR DHRU FUSION
+                Actions\Action::make('syncDhru')
+                    ->label('Sincronizar Servidor (DHRU)')
+                    ->icon('heroicon-o-server')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Conectar con DHRU Fusion')
+                    ->modalDescription('Se importarán los servicios IMEI/Unlock y sus precios en Créditos.')
+                    ->action(fn () => $this->syncDhruFusion()),
+            ])
+            ->label('Sincronizar APIs')
+            ->icon('heroicon-m-arrow-path')
+            ->color('gray')
+            ->button(),
+        ];
+    }
+
+    // --- LÓGICA WOOCOMMERCE ---
+    public function syncWooCommerce()
+    {
+        if (!env('WOO_URL') || !env('WOO_KEY')) {
+            $this->notifyError('Faltan credenciales WOO en .env');
+            return;
+        }
+
+        try {
+            $woocommerce = new Client(
+                env('WOO_URL'),
+                env('WOO_KEY'),
+                env('WOO_SECRET'),
+                ['version' => 'wc/v3', 'verify_ssl' => false, 'timeout' => 60]
+            );
+
+            // Traemos 100 productos (puedes aumentar si necesitas más paginación)
+            $wooProducts = $woocommerce->get('products', ['per_page' => 100]);
+            
+            $processedWooIds = []; // Lista para rastrear qué IDs siguen vivos
+
+            foreach ($wooProducts as $item) {
+                // A. PRODUCTOS VARIABLES
+                if ($item->type === 'variable') {
+                    $variations = $woocommerce->get("products/{$item->id}/variations", ['per_page' => 50]);
+                    foreach ($variations as $variation) {
+                        $attributes = array_map(fn($attr) => $attr->option, $variation->attributes);
+                        $variationName = $item->name . ' - ' . implode(', ', $attributes);
+                        $isActive = ($item->status === 'publish' && ($variation->stock_status ?? 'instock') === 'instock');
+
+                        Product::withTrashed()->updateOrCreate(
+                            ['woocommerce_product_id' => $variation->id],
+                            [
+                                'name' => $variationName,
+                                'price' => $variation->price ?: 0,
+                                'sku' => $variation->sku,
+                                'type' => 'digital_product',
+                                'is_active' => $isActive,
+                                'deleted_at' => null, // Restaurar si estaba borrado
+                            ]
+                        );
+                        $processedWooIds[] = $variation->id;
+                    }
+                } 
+                // B. PRODUCTOS SIMPLES
+                else {
+                    $isActive = ($item->status === 'publish' && ($item->stock_status ?? 'instock') === 'instock');
+                    Product::withTrashed()->updateOrCreate(
+                        ['woocommerce_product_id' => $item->id],
+                        [
+                            'name' => $item->name,
+                            'price' => $item->price ?: 0,
+                            'sku' => $item->sku,
+                            'type' => 'digital_product',
+                            'is_active' => $isActive,
+                            'deleted_at' => null,
+                        ]
+                    );
+                    $processedWooIds[] = $item->id;
+                }
+            }
+
+            // C. LIMPIEZA (Soft Delete)
+            // Borramos los productos locales que tienen ID de Woo pero NO llegaron en esta sincronización
+            if (count($processedWooIds) > 0) {
+                Product::whereNotNull('woocommerce_product_id')
+                    ->whereNotIn('woocommerce_product_id', $processedWooIds)
+                    ->delete();
+            }
+
+            $this->notifySuccess('WooCommerce sincronizado correctamente.');
+
+        } catch (\Exception $e) {
+            $this->notifyError($e->getMessage());
+        }
+    }
+
+    // --- LÓGICA DHRU FUSION ---
+    public function syncDhruFusion()
+    {
+        $url = env('DHRU_URL');
+        $user = env('DHRU_USER');
+        $key = env('DHRU_KEY');
+
+        if (!$url || !$user || !$key) {
+            $this->notifyError('Faltan credenciales DHRU en .env');
+            return;
+        }
+
+        try {
+            // DHRU usa POST estándar
+            $response = Http::asForm()->post($url . '/api/index.php', [
+                'username' => $user,
+                'apiaccesskey' => $key,
+                'action' => 'imeiservicelist', // Acción estándar para listar servicios
+                'requestformat' => 'JSON',
+            ]);
+
+            if ($response->failed()) {
+                throw new \Exception('Error conectando al servidor DHRU');
+            }
+
+            $json = $response->json();
+
+            // Validar respuesta exitosa
+            if (!isset($json['SUCCESS'])) {
+                // A veces Dhru devuelve error en otro formato
+                throw new \Exception('Respuesta inválida o credenciales incorrectas.');
+            }
+
+            $services = $json['SUCCESS'][0]['LIST'] ?? $json['SUCCESS']; // Dhru varía estructura a veces
+
+            $count = 0;
+            // Procesar lista
+            // Estructura usual: ['SERVICEID', 'SERVICENAME', 'CREDIT', 'TIME']
+            foreach ($services as $group) {
+                 // Dhru agrupa por carpetas, a veces la lista plana está dentro, 
+                 // o a veces devuelve lista plana directa. Asumimos lista plana o iteramos grupos.
+                 // Si la estructura es simple lista de objetos:
+                 
+                 // Ajuste para estructura típica de Dhru v6:
+                 // Puede venir agrupado. Si $group tiene 'GROUPNAME', hay que iterar sus servicios.
+                 if (isset($group['GROUPNAME']) && isset($group['SERVICES'])) {
+                     foreach ($group['SERVICES'] as $service) {
+                         $this->createDhruProduct($service);
+                         $count++;
+                     }
+                 } elseif (isset($group['SERVICEID'])) {
+                     // Lista plana
+                     $this->createDhruProduct($group);
+                     $count++;
+                 }
+            }
+
+            $this->notifySuccess("Se importaron {$count} servicios de DHRU Fusion.");
+
+        } catch (\Exception $e) {
+            $this->notifyError('Error DHRU: ' . $e->getMessage());
+        }
+    }
+
+    private function createDhruProduct($serviceData)
+    {
+        // Mapeo de campos DHRU
+        $dhruId = $serviceData['SERVICEID'] ?? null;
+        $name = $serviceData['SERVICENAME'] ?? 'Servicio Desconocido';
+        $price = $serviceData['CREDIT'] ?? 0;
+
+        if ($dhruId) {
+            Product::updateOrCreate(
+                ['sku' => 'DHRU-' . $dhruId], // Usamos SKU para identificar únicos de Dhru
+                [
+                    'name' => $name,
+                    'price' => $price,
+                    'type' => 'service', // Lo marcamos como Servicio Servidor
+                    'is_active' => true,
+                ]
+            );
+        }
+    }
+
+    // Helpers de Notificación
+    private function notifySuccess($msg)
+    {
+        Notification::make()->title('Éxito')->body($msg)->success()->send();
+    }
+
+    private function notifyError($msg)
+    {
+        Notification::make()->title('Error')->body($msg)->danger()->send();
+    }
+}
