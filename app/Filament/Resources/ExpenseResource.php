@@ -69,7 +69,7 @@ class ExpenseResource extends Resource
                                         return Currency::where('is_active', true)
                                             ->get()
                                             ->mapWithKeys(function ($currency) {
-                                                return [$currency->code => $currency->short_display];
+                                                return [$currency->code => $currency->code . ' - ' . $currency->name];
                                             });
                                     })
                                     ->default('USD')
@@ -136,7 +136,7 @@ class ExpenseResource extends Resource
 
                                 if ($amountUSD > 0 && $exchangeRate > 0) {
                                     return sprintf(
-                                        '%s %s = $%.2f USD (Tasa: %.6f)',
+                                        '%s %s = $%.2f USD (Tasa: %.2f)',
                                         number_format($amount, 2),
                                         $currency,
                                         $amountUSD,

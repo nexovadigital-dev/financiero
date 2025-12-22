@@ -37,7 +37,9 @@ class Reportes extends Page implements HasTable, HasForms
     public ?array $filters = [
         'startDate' => null,
         'endDate' => null,
-        'currency' => 'USD',
+        'source' => 'all',
+        'payment_method_id' => null,
+        'client_id' => null,
     ];
 
     public function mount(): void
@@ -46,7 +48,9 @@ class Reportes extends Page implements HasTable, HasForms
         $this->form->fill([
             'startDate' => now()->startOfMonth(),
             'endDate' => now()->endOfDay(),
-            'currency' => 'USD',
+            'source' => 'all',
+            'payment_method_id' => null,
+            'client_id' => null,
         ]);
     }
 
@@ -55,8 +59,8 @@ class Reportes extends Page implements HasTable, HasForms
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Filtros de Reporte')
-                    ->description('Los datos se actualizan automáticamente al cambiar las fechas o moneda.')
+                Forms\Components\Section::make('Filtros Avanzados de Reporte')
+                    ->description('Los datos se actualizan automáticamente. Todos los montos se muestran en USD para comparación universal.')
                     ->schema([
                         Forms\Components\Grid::make(3)
                             ->schema([
@@ -65,8 +69,8 @@ class Reportes extends Page implements HasTable, HasForms
                                     ->required()
                                     ->default(now()->startOfMonth())
                                     ->live()
-                                    ->afterStateUpdated(fn () => $this->filterTable()), 
-                                
+                                    ->afterStateUpdated(fn () => $this->filterTable()),
+
                                 Forms\Components\DatePicker::make('endDate')
                                     ->label('Fecha Fin')
                                     ->required()
@@ -74,14 +78,34 @@ class Reportes extends Page implements HasTable, HasForms
                                     ->live()
                                     ->afterStateUpdated(fn () => $this->filterTable()),
 
-                                Forms\Components\Select::make('currency')
-                                    ->label('Moneda')
+                                Forms\Components\Select::make('source')
+                                    ->label('Origen de Venta')
                                     ->options([
-                                        'USD' => 'Dólares (USD)',
-                                        'NIO' => 'Córdobas (NIO)',
+                                        'all' => '📊 Todos',
+                                        'store' => '🏪 Solo Tienda',
+                                        'server' => '🖥️ Solo Servidor',
                                     ])
-                                    ->default('USD')
+                                    ->default('all')
                                     ->required()
+                                    ->live()
+                                    ->afterStateUpdated(fn () => $this->filterTable()),
+                            ]),
+
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\Select::make('payment_method_id')
+                                    ->label('Método de Pago')
+                                    ->placeholder('Todos los métodos')
+                                    ->options(\App\Models\PaymentMethod::pluck('name', 'id'))
+                                    ->searchable()
+                                    ->live()
+                                    ->afterStateUpdated(fn () => $this->filterTable()),
+
+                                Forms\Components\Select::make('client_id')
+                                    ->label('Cliente Específico')
+                                    ->placeholder('Todos los clientes')
+                                    ->options(\App\Models\Client::pluck('name', 'id'))
+                                    ->searchable()
                                     ->live()
                                     ->afterStateUpdated(fn () => $this->filterTable()),
                             ]),
@@ -109,20 +133,34 @@ class Reportes extends Page implements HasTable, HasForms
     {
         return $table
             ->query(Sale::query())
-            // Aplicar filtros
+            // Aplicar filtros avanzados
             ->modifyQueryUsing(function (Builder $query) {
                 $data = $this->filters;
-                
+
+                // Filtro por fecha
                 if ($data['startDate'] ?? null) {
                     $query->whereDate('sale_date', '>=', $data['startDate']);
                 }
                 if ($data['endDate'] ?? null) {
                     $query->whereDate('sale_date', '<=', $data['endDate']);
                 }
-                if ($data['currency'] ?? null) {
-                    $query->where('currency', $data['currency']);
+
+                // Filtro por origen (tienda/servidor)
+                if (($data['source'] ?? 'all') !== 'all') {
+                    $query->where('source', $data['source']);
                 }
-                
+
+                // Filtro por método de pago
+                if ($data['payment_method_id'] ?? null) {
+                    $query->where('payment_method_id', $data['payment_method_id']);
+                }
+
+                // Filtro por cliente específico
+                if ($data['client_id'] ?? null) {
+                    $query->where('client_id', $data['client_id']);
+                }
+
+                // Solo ventas completadas
                 $query->where('status', 'completed');
             })
             ->columns([
@@ -152,25 +190,44 @@ class Reportes extends Page implements HasTable, HasForms
 
                 Tables\Columns\TextColumn::make('paymentMethod.name')
                     ->label('Método')
-                    ->icon('heroicon-m-credit-card'),
+                    ->badge()
+                    ->color('info'),
+
+                Tables\Columns\TextColumn::make('currency')
+                    ->label('Divisa')
+                    ->badge()
+                    ->color('gray'),
 
                 Tables\Columns\TextColumn::make('total_amount')
-                    ->label('Monto')
+                    ->label('Monto Original')
                     ->money(fn ($record) => $record->currency)
+                    ->weight('medium'),
+
+                Tables\Columns\TextColumn::make('amount_usd')
+                    ->label('Monto USD')
+                    ->money('USD')
                     ->weight('bold')
                     ->color('success')
-                    ->summarize(Tables\Columns\Summarizers\Sum::make()->label('TOTAL')->money()),
+                    ->getStateUsing(fn ($record) => $record->amount_usd ?? $record->total_amount)
+                    ->summarize(Tables\Columns\Summarizers\Sum::make()->label('TOTAL USD')->money('USD')),
+
+                Tables\Columns\IconColumn::make('manually_converted')
+                    ->label('Manual')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-pencil')
+                    ->falseIcon('heroicon-o-calculator')
+                    ->tooltip(fn ($record) => $record->manually_converted ? 'Editado manualmente' : 'Calculado automáticamente'),
             ])
             ->defaultSort('sale_date', 'desc')
             ->headerActions([
                 ExportAction::make()
-                    ->label('Descargar')
+                    ->label('Exportar Excel/CSV')
                     ->color('success')
                     ->icon('heroicon-m-arrow-down-tray')
                     ->exports([
                         ExcelExport::make()
                             ->fromTable()
-                            ->withFilename(fn () => 'Reporte_NicaGSM_' . date('Y-m-d'))
+                            ->withFilename(fn () => 'Reporte_NicaGSM_' . date('Y-m-d_His'))
                             ->askForWriterType()
                             ->withColumns([
                                 Column::make('id')->heading('ID'),
@@ -178,9 +235,12 @@ class Reportes extends Page implements HasTable, HasForms
                                 Column::make('client.name')->heading('Cliente'),
                                 Column::make('source')->heading('Origen'),
                                 Column::make('status')->heading('Estado'),
-                                Column::make('paymentMethod.name')->heading('Método'),
-                                Column::make('total_amount')->heading('Monto'),
+                                Column::make('paymentMethod.name')->heading('Método de Pago'),
                                 Column::make('currency')->heading('Moneda'),
+                                Column::make('total_amount')->heading('Monto Original'),
+                                Column::make('amount_usd')->heading('Monto USD'),
+                                Column::make('exchange_rate_used')->heading('Tasa Usada'),
+                                Column::make('payment_reference')->heading('Referencia'),
                             ]),
                     ]),
             ]);

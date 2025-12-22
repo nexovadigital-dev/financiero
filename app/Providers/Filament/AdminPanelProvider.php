@@ -37,7 +37,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(\App\Filament\Pages\Auth\Login::class)
             // COLORES NICAGSM
             ->colors([
                 'primary' => '#7cbd2b', // Verde NicaGSM
@@ -45,6 +45,9 @@ class AdminPanelProvider extends PanelProvider
             ])
             // BRANDING
             ->brandName('NicaGSM Admin')
+            ->brandLogo(asset('images/logo.png'))
+            ->brandLogoHeight('3rem')
+            ->favicon(asset('images/favicon.png'))
             
             // UI / UX
             ->spa()

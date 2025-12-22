@@ -95,12 +95,18 @@ class CurrencyResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('display_name')
-                    ->label('Divisa')
-                    ->searchable(['code', 'name'])
-                    ->sortable(['code'])
+                Tables\Columns\TextColumn::make('code')
+                    ->label('Código')
+                    ->searchable()
+                    ->sortable()
                     ->weight('bold')
-                    ->size('lg'),
+                    ->badge()
+                    ->color('primary'),
+
+                Tables\Columns\TextColumn::make('name')
+                    ->label('Nombre')
+                    ->searchable()
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('symbol')
                     ->label('Símbolo')
@@ -110,7 +116,7 @@ class CurrencyResource extends Resource
                 Tables\Columns\TextColumn::make('exchange_rate')
                     ->label('Tasa (1 USD =)')
                     ->formatStateUsing(fn ($state, $record) =>
-                        $record->is_base ? 'BASE' : number_format($state, 6) . ' ' . $record->code
+                        $record->is_base ? 'BASE' : number_format($state, 2) . ' ' . $record->code
                     )
                     ->badge()
                     ->color(fn ($record) => $record->is_base ? 'success' : 'info'),

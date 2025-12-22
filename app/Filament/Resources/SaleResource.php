@@ -109,7 +109,7 @@ class SaleResource extends Resource
                                         return Currency::where('is_active', true)
                                             ->get()
                                             ->mapWithKeys(function ($currency) {
-                                                return [$currency->code => $currency->short_display];
+                                                return [$currency->code => $currency->code . ' - ' . $currency->name];
                                             });
                                     })
                                     ->default('USD')
@@ -154,7 +154,7 @@ class SaleResource extends Resource
 
                                         if ($amountUSD > 0 && $exchangeRate > 0) {
                                             return sprintf(
-                                                '%s %s = $%.2f USD (Tasa: %.6f)',
+                                                '%s %s = $%.2f USD (Tasa: %.2f)',
                                                 number_format($totalAmount, 2),
                                                 $currency,
                                                 $amountUSD,
@@ -216,13 +216,27 @@ class SaleResource extends Resource
                                             ->columnSpan(1),
 
                                         Forms\Components\TextInput::make('unit_price')
-                                            ->label('Precio Unit.')
+                                            ->label('Precio Unit. (USD)')
                                             ->numeric()
                                             ->prefix('$')
                                             ->live(onBlur: true) // PERMITE EDITAR EL PRECIO
                                             ->afterStateUpdated(function ($state, Set $set, Get $get) {
                                                 $qty = $get('quantity') ?? 1;
                                                 $set('total_price', $state * $qty);
+                                            })
+                                            ->helperText(function (Get $get) {
+                                                $currency = $get('../../currency');
+                                                $price = floatval($get('unit_price') ?? 0);
+
+                                                if ($currency && $currency !== 'USD' && $price > 0) {
+                                                    $currencyModel = \App\Models\Currency::where('code', $currency)->first();
+                                                    if ($currencyModel) {
+                                                        $converted = $currencyModel->convertFromUSD($price);
+                                                        return "≈ " . number_format($converted, 2) . " " . $currency;
+                                                    }
+                                                }
+
+                                                return 'Precio base en USD';
                                             })
                                             ->columnSpan(1),
                                             

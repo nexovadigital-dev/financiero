@@ -97,20 +97,14 @@ class SyncWooCommerceProducts extends Command
 
     private function syncProduct($wooProduct)
     {
-        // Determinar el tipo de producto
-        $type = match($wooProduct->type) {
-            'simple', 'variable' => 'digital_product',
-            default => 'digital_product'
-        };
-
         // Actualizar o crear producto (SOLO actualiza, nunca elimina)
         Product::updateOrCreate(
             ['woocommerce_product_id' => $wooProduct->id],
             [
                 'name' => $wooProduct->name,
-                'price' => floatval($wooProduct->price),
-                'sku' => $wooProduct->sku,
-                'type' => $type,
+                'price' => floatval($wooProduct->price ?: 0),
+                'sku' => $wooProduct->sku ?: '',
+                'type' => 'store', // Artículos de tienda WooCommerce
                 'is_active' => $wooProduct->status === 'publish',
             ]
         );
@@ -125,16 +119,16 @@ class SyncWooCommerceProducts extends Command
             ->map(fn($attr) => $attr->option)
             ->join(', ');
 
-        $variantName = "{$parentProduct->name} [{$attributes}]";
+        $variantName = "{$parentProduct->name} - {$attributes}";
 
         // Actualizar o crear variante (SOLO actualiza, nunca elimina)
         Product::updateOrCreate(
             ['woocommerce_product_id' => $variant->id],
             [
                 'name' => $variantName,
-                'price' => floatval($variant->price),
-                'sku' => $variant->sku,
-                'type' => 'digital_product',
+                'price' => floatval($variant->price ?: 0),
+                'sku' => $variant->sku ?: '',
+                'type' => 'store', // Artículos de tienda WooCommerce
                 'is_active' => $variant->status === 'publish',
             ]
         );
