@@ -17,23 +17,28 @@ class SyncWooCommerceProducts extends Command
         $this->info('🔄 Iniciando sincronización de productos desde WooCommerce...');
         $this->warn('⚠️  MODO SOLO LECTURA: No se modificará ni eliminará nada en WooCommerce');
 
+        // Soportar tanto WOOCOMMERCE_* como WOO_* variables
+        $wooUrl = env('WOOCOMMERCE_URL') ?? env('WOO_URL');
+        $wooKey = env('WOOCOMMERCE_CONSUMER_KEY') ?? env('WOO_KEY');
+        $wooSecret = env('WOOCOMMERCE_CONSUMER_SECRET') ?? env('WOO_SECRET');
+
         // Verificar configuración
-        if (!env('WOOCOMMERCE_URL') || !env('WOOCOMMERCE_CONSUMER_KEY') || !env('WOOCOMMERCE_CONSUMER_SECRET')) {
+        if (!$wooUrl || !$wooKey || !$wooSecret) {
             $this->error('❌ Error: Faltan credenciales de WooCommerce en el archivo .env');
             $this->line('');
             $this->line('Agrega las siguientes variables a tu archivo .env:');
-            $this->line('WOOCOMMERCE_URL=https://tu-tienda.com');
-            $this->line('WOOCOMMERCE_CONSUMER_KEY=ck_xxxxxxxxxxxxx');
-            $this->line('WOOCOMMERCE_CONSUMER_SECRET=cs_xxxxxxxxxxxxx');
+            $this->line('WOO_URL=https://tu-tienda.com');
+            $this->line('WOO_KEY=ck_xxxxxxxxxxxxx');
+            $this->line('WOO_SECRET=cs_xxxxxxxxxxxxx');
             return Command::FAILURE;
         }
 
         try {
             // Inicializar cliente WooCommerce
             $woocommerce = new Client(
-                env('WOOCOMMERCE_URL'),
-                env('WOOCOMMERCE_CONSUMER_KEY'),
-                env('WOOCOMMERCE_CONSUMER_SECRET'),
+                $wooUrl,
+                $wooKey,
+                $wooSecret,
                 [
                     'version' => 'wc/v3',
                     'timeout' => 60,

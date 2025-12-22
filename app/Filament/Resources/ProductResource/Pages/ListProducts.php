@@ -54,16 +54,21 @@ class ListProducts extends ListRecords
     // --- LÓGICA WOOCOMMERCE ---
     public function syncWooCommerce()
     {
-        if (!env('WOOCOMMERCE_URL') || !env('WOOCOMMERCE_CONSUMER_KEY') || !env('WOOCOMMERCE_CONSUMER_SECRET')) {
-            $this->notifyError('Faltan credenciales WOOCOMMERCE en .env (WOOCOMMERCE_URL, WOOCOMMERCE_CONSUMER_KEY, WOOCOMMERCE_CONSUMER_SECRET)');
+        // Soportar tanto WOOCOMMERCE_* como WOO_* variables
+        $wooUrl = env('WOOCOMMERCE_URL') ?? env('WOO_URL');
+        $wooKey = env('WOOCOMMERCE_CONSUMER_KEY') ?? env('WOO_KEY');
+        $wooSecret = env('WOOCOMMERCE_CONSUMER_SECRET') ?? env('WOO_SECRET');
+
+        if (!$wooUrl || !$wooKey || !$wooSecret) {
+            $this->notifyError('Faltan credenciales WooCommerce en .env (WOO_URL, WOO_KEY, WOO_SECRET)');
             return;
         }
 
         try {
             $woocommerce = new Client(
-                env('WOOCOMMERCE_URL'),
-                env('WOOCOMMERCE_CONSUMER_KEY'),
-                env('WOOCOMMERCE_CONSUMER_SECRET'),
+                $wooUrl,
+                $wooKey,
+                $wooSecret,
                 ['version' => 'wc/v3', 'verify_ssl' => true, 'timeout' => 60]
             );
 

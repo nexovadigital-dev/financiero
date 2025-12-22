@@ -32,6 +32,15 @@ class CurrencySeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'code' => 'COP',
+                'name' => 'Peso Colombiano',
+                'symbol' => 'COP$',
+                'country_code' => 'CO',
+                'exchange_rate' => 4200.000000, // 1 USD = 4200 COP (aproximado, actualizable)
+                'is_base' => false,
+                'is_active' => true,
+            ],
+            [
                 'code' => 'EUR',
                 'name' => 'Euro',
                 'symbol' => '€',

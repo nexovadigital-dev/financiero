@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\SaleResource\Pages;
 use App\Models\Sale;
 use App\Models\Product;
+use App\Models\Currency;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -96,24 +97,83 @@ class SaleResource extends Resource
                                     ->label('Método de Pago')
                                     ->relationship('paymentMethod', 'name')
                                     ->required(),
-    
+
+                                Forms\Components\TextInput::make('payment_reference')
+                                    ->label('Referencia de Pago')
+                                    ->placeholder('Ej: Transfer-12345, Cheque #678')
+                                    ->maxLength(100),
+
                                 Forms\Components\Select::make('currency')
                                     ->label('Moneda')
-                                    ->options([
-                                        'USD' => 'USD',
-                                        'NIO' => 'NIO',
-                                    ])
+                                    ->options(function () {
+                                        return Currency::where('is_active', true)
+                                            ->get()
+                                            ->mapWithKeys(function ($currency) {
+                                                return [$currency->code => $currency->short_display];
+                                            });
+                                    })
                                     ->default('USD')
+                                    ->live()
+                                    ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                                        self::convertCurrency($get, $set, $state);
+                                    })
                                     ->required(),
 
                                 Forms\Components\TextInput::make('total_amount')
                                     ->label('TOTAL A PAGAR')
                                     ->prefix('$')
-                                    ->readOnly()
                                     ->numeric()
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                                        // Si el usuario edita manualmente, marcar como convertido manualmente
+                                        $set('manually_converted', true);
+
+                                        // Recalcular USD basado en el valor editado
+                                        $currency = Currency::where('code', $get('currency'))->first();
+                                        if ($currency) {
+                                            $amountUSD = $currency->convertToUSD(floatval($state));
+                                            $set('amount_usd', $amountUSD);
+                                            $set('exchange_rate_used', $currency->exchange_rate);
+                                        }
+                                    })
                                     ->extraInputAttributes(['style' => 'font-size: 1.5rem; font-weight: bold; color: #7cbd2b; text-align: right;'])
-                                    ->dehydrated() // IMPORTANTE: Para que se guarde en BD aunque sea readOnly
+                                    ->helperText('💡 Editable: Puede ajustar el monto manualmente')
                                     ->required(),
+
+                                Forms\Components\Placeholder::make('conversion_info')
+                                    ->label('Información de Conversión')
+                                    ->content(function (Get $get) {
+                                        $currency = $get('currency');
+                                        $totalAmount = floatval($get('total_amount') ?? 0);
+                                        $amountUSD = floatval($get('amount_usd') ?? 0);
+                                        $exchangeRate = floatval($get('exchange_rate_used') ?? 0);
+
+                                        if ($currency === 'USD') {
+                                            return '✓ Moneda base (USD)';
+                                        }
+
+                                        if ($amountUSD > 0 && $exchangeRate > 0) {
+                                            return sprintf(
+                                                '%s %s = $%.2f USD (Tasa: %.6f)',
+                                                number_format($totalAmount, 2),
+                                                $currency,
+                                                $amountUSD,
+                                                $exchangeRate
+                                            );
+                                        }
+
+                                        return 'Seleccione moneda para ver conversión';
+                                    }),
+
+                                Forms\Components\Hidden::make('amount_usd')
+                                    ->dehydrated(),
+
+                                Forms\Components\Hidden::make('exchange_rate_used')
+                                    ->dehydrated(),
+
+                                Forms\Components\Hidden::make('manually_converted')
+                                    ->default(false)
+                                    ->dehydrated(),
                             ]),
                     ])->columnSpan(1),
 
@@ -196,8 +256,41 @@ class SaleResource extends Resource
                 $sum += ($price * $qty);
             }
         }
-        
+
         $set('total_amount', $sum);
+
+        // Aplicar conversión de moneda automáticamente
+        $currency = $get('currency');
+        if ($currency) {
+            self::convertCurrency($get, $set, $currency);
+        }
+    }
+
+    // Función para convertir moneda automáticamente
+    public static function convertCurrency(Get $get, Set $set, $currencyCode): void
+    {
+        $currency = Currency::where('code', $currencyCode)->first();
+
+        if (!$currency) {
+            return;
+        }
+
+        $totalAmount = floatval($get('total_amount') ?? 0);
+
+        if ($currency->is_base) {
+            // Si es USD (moneda base), no hay conversión
+            $set('amount_usd', $totalAmount);
+            $set('exchange_rate_used', 1.000000);
+            $set('manually_converted', false);
+        } else {
+            // Convertir de USD a la moneda seleccionada
+            // Los productos están en USD por defecto, entonces convertimos a la moneda destino
+            $convertedAmount = $currency->convertFromUSD($totalAmount);
+            $set('total_amount', $convertedAmount);
+            $set('amount_usd', $totalAmount); // Guardamos el original en USD
+            $set('exchange_rate_used', $currency->exchange_rate);
+            $set('manually_converted', false);
+        }
     }
 
     public static function table(Table $table): Table

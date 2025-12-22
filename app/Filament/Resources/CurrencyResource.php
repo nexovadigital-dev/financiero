@@ -35,7 +35,8 @@ class CurrencyResource extends Resource
                                     ->required()
                                     ->maxLength(3)
                                     ->unique(ignoreRecord: true)
-                                    ->uppercase(),
+                                    ->afterStateUpdated(fn ($state, $set) => $set('code', strtoupper($state)))
+                                    ->live(onBlur: true),
 
                                 Forms\Components\TextInput::make('name')
                                     ->label('Nombre')
@@ -55,7 +56,8 @@ class CurrencyResource extends Resource
                                     ->helperText('Código ISO de 2 letras para mostrar la bandera')
                                     ->required()
                                     ->maxLength(2)
-                                    ->uppercase(),
+                                    ->afterStateUpdated(fn ($state, $set) => $set('country_code', strtoupper($state)))
+                                    ->live(onBlur: true),
                             ]),
                     ]),
 
