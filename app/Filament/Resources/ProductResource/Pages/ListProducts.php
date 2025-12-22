@@ -23,10 +23,10 @@ class ListProducts extends ListRecords
 
             // GRUPO DE ACCIONES DE SINCRONIZACIÓN
             Actions\ActionGroup::make([
-                
+
                 // 1. SINCRONIZAR WOOCOMMERCE
                 Actions\Action::make('syncWoo')
-                    ->label('Sincronizar Tienda (Woo)')
+                    ->label('🏪 Tienda (WooCommerce)')
                     ->icon('heroicon-o-shopping-bag')
                     ->color('info')
                     ->requiresConfirmation()
@@ -36,7 +36,7 @@ class ListProducts extends ListRecords
 
                 // 2. SINCRONIZAR DHRU FUSION
                 Actions\Action::make('syncDhru')
-                    ->label('Sincronizar Servidor (DHRU)')
+                    ->label('🖥️ Servidor (DHRU)')
                     ->icon('heroicon-o-server')
                     ->color('warning')
                     ->requiresConfirmation()
@@ -44,7 +44,7 @@ class ListProducts extends ListRecords
                     ->modalDescription('Se importarán los servicios IMEI/Unlock y sus precios en Créditos.')
                     ->action(fn () => $this->syncDhruFusion()),
             ])
-            ->label('Sincronizar APIs')
+            ->label('Sincronizar')
             ->icon('heroicon-m-arrow-path')
             ->color('gray')
             ->button(),

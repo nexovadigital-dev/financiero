@@ -114,11 +114,14 @@ class ProductResource extends Resource
                         'service' => 'warning',
                         'server_credit' => 'info',
                         'digital_product' => 'success',
+                        'store' => 'primary',
+                        default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'service' => 'Servicio Servidor',
                         'server_credit' => 'Crédito Servidor',
                         'digital_product' => 'Artículo Tienda',
+                        'store' => 'Tienda',
                         default => $state,
                     }),
 

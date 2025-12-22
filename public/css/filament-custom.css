@@ -126,38 +126,79 @@
 /* Asegurar que formularios tengan z-index correcto */
 .fi-fo {
     position: relative;
-    z-index: 10 !important;
+    z-index: 100 !important;
 }
 
 /* Widgets deben estar debajo de los formularios */
 .fi-wi {
     position: relative;
-    z-index: 5 !important;
+    z-index: 1 !important;
 }
 
-/* Secciones de filtros con margen inferior adecuado */
+/* Widget de estadísticas específico */
+.fi-wi-stats-overview {
+    z-index: 1 !important;
+}
+
+/* Secciones de filtros con margen inferior adecuado y z-index alto */
 .fi-fo-section {
     margin-bottom: 2rem !important;
+    position: relative;
+    z-index: 100 !important;
+}
+
+/* Contenedor de sección expandido */
+.fi-section-content-ctn {
+    position: relative;
+    z-index: 100 !important;
+}
+
+/* Grid de formularios */
+.fi-fo .fi-grid {
+    position: relative;
+    z-index: 100 !important;
 }
 
 /* Selectores y campos de formulario */
 .fi-fo-field-wrp {
     position: relative;
-    z-index: 20 !important;
+    z-index: 200 !important;
 }
 
 /* Dropdowns de select deben tener z-index alto */
 .fi-fo-field-wrp select,
-.fi-select-button {
+.fi-select-button,
+.fi-input-wrp {
     position: relative;
-    z-index: 30 !important;
+    z-index: 200 !important;
+}
+
+/* Panel de opciones de select (desplegable) */
+.fi-select-options,
+[x-data*="select"] > div[role="listbox"],
+[x-data*="select"] .fi-select-list,
+.fi-fo-select-options-container {
+    z-index: 99999 !important;
+    position: absolute !important;
 }
 
 /* Menús desplegables de Filament */
 [x-data*="select"] ul,
 .fi-dropdown-panel,
-.choices__list--dropdown {
-    z-index: 9999 !important;
+.choices__list--dropdown,
+.fi-select-dropdown {
+    z-index: 99999 !important;
+}
+
+/* Flatpickr calendar (date picker) */
+.flatpickr-calendar {
+    z-index: 99999 !important;
+}
+
+/* Asegurar que los widgets NO interfieran */
+.fi-page-header-widgets,
+.fi-page-header-ctn {
+    z-index: 1 !important;
 }
 
 /* ==================================
@@ -290,6 +331,29 @@
 
 .fi-btn:active {
     transform: translateY(0);
+}
+
+/* Action Groups - Botones más amplios */
+.fi-ac-group-btn {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    min-width: fit-content !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
+
+/* Dropdown de Action Groups */
+.fi-ac-group-dropdown {
+    min-width: 250px !important;
+}
+
+/* Botones de header actions con mejor espaciado */
+.fi-page-header-actions {
+    gap: 0.75rem !important;
+}
+
+.fi-page-header-actions .fi-btn {
+    white-space: nowrap !important;
 }
 
 /* Inputs con mejor focus */

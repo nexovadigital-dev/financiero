@@ -23,7 +23,7 @@ class ListClients extends ListRecords
             Actions\ActionGroup::make([
                 // 1. IMPORTACIÓN MASIVA (Ahora con Bucle Infinito hasta terminar)
                 Actions\Action::make('syncAll')
-                    ->label('Importar TODOS (Masivo)')
+                    ->label('Importar Todos')
                     ->icon('heroicon-o-users')
                     ->color('warning')
                     ->requiresConfirmation()
@@ -33,7 +33,7 @@ class ListClients extends ListRecords
 
                 // 2. BUSCADOR ESPECÍFICO
                 Actions\Action::make('searchWoo')
-                    ->label('Buscar Cliente en Tienda')
+                    ->label('Buscar Específico')
                     ->icon('heroicon-o-magnifying-glass')
                     ->color('info')
                     ->form([
@@ -48,7 +48,7 @@ class ListClients extends ListRecords
                         $this->syncWooClients($data['search_term']);
                     }),
             ])
-            ->label('Conexión WooCommerce')
+            ->label('WooCommerce')
             ->icon('heroicon-m-arrow-path')
             ->color('gray')
             ->button(),
