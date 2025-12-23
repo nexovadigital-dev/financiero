@@ -134,12 +134,15 @@ class ProductResource extends Resource
                     ->label('Disp.')
                     ->boolean(),
             ])
+            ->defaultSort('type', 'asc') // Ordenar por tipo: store primero, luego service, luego server_credit
             ->filters([
                 Tables\Filters\SelectFilter::make('type')
+                    ->label('Tipo de Producto')
                     ->options([
-                        'digital_product' => 'Tienda',
-                        'service' => 'Servicio',
-                        'server_credit' => 'Crédito',
+                        'store' => '🏪 Tienda (WooCommerce)',
+                        'digital_product' => '📦 Artículo Digital',
+                        'service' => '🖥️ Servicio Servidor',
+                        'server_credit' => '💳 Crédito Servidor',
                     ]),
             ])
             ->actions([
