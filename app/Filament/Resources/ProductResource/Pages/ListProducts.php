@@ -23,20 +23,20 @@ class ListProducts extends ListRecords
 
             // GRUPO DE ACCIONES DE SINCRONIZACIÓN
             Actions\ActionGroup::make([
-                
+
                 // 1. SINCRONIZAR WOOCOMMERCE
                 Actions\Action::make('syncWoo')
-                    ->label('Sincronizar Tienda (Woo)')
+                    ->label('🏪 Tienda (WooCommerce)')
                     ->icon('heroicon-o-shopping-bag')
                     ->color('info')
                     ->requiresConfirmation()
-                    ->modalHeading('Sincronizar WooCommerce')
-                    ->modalDescription('Se descargarán productos y variantes. Los productos que ya no existan en la tienda se eliminarán de esta lista (sin afectar historial).')
+                    ->modalHeading('Sincronizar WooCommerce (SOLO LECTURA)')
+                    ->modalDescription('⚠️ MODO SOLO LECTURA: Se descargarán productos y variantes desde WooCommerce. Esta operación NO modificará ni eliminará NADA en tu tienda WooCommerce. Solo actualiza la lista local.')
                     ->action(fn () => $this->syncWooCommerce()),
 
                 // 2. SINCRONIZAR DHRU FUSION
                 Actions\Action::make('syncDhru')
-                    ->label('Sincronizar Servidor (DHRU)')
+                    ->label('🖥️ Servidor (DHRU)')
                     ->icon('heroicon-o-server')
                     ->color('warning')
                     ->requiresConfirmation()
@@ -44,7 +44,7 @@ class ListProducts extends ListRecords
                     ->modalDescription('Se importarán los servicios IMEI/Unlock y sus precios en Créditos.')
                     ->action(fn () => $this->syncDhruFusion()),
             ])
-            ->label('Sincronizar APIs')
+            ->label('Sincronizar')
             ->icon('heroicon-m-arrow-path')
             ->color('gray')
             ->button(),
@@ -54,17 +54,22 @@ class ListProducts extends ListRecords
     // --- LÓGICA WOOCOMMERCE ---
     public function syncWooCommerce()
     {
-        if (!env('WOO_URL') || !env('WOO_KEY')) {
-            $this->notifyError('Faltan credenciales WOO en .env');
+        // Soportar tanto WOOCOMMERCE_* como WOO_* variables
+        $wooUrl = env('WOOCOMMERCE_URL') ?? env('WOO_URL');
+        $wooKey = env('WOOCOMMERCE_CONSUMER_KEY') ?? env('WOO_KEY');
+        $wooSecret = env('WOOCOMMERCE_CONSUMER_SECRET') ?? env('WOO_SECRET');
+
+        if (!$wooUrl || !$wooKey || !$wooSecret) {
+            $this->notifyError('Faltan credenciales WooCommerce en .env (WOO_URL, WOO_KEY, WOO_SECRET)');
             return;
         }
 
         try {
             $woocommerce = new Client(
-                env('WOO_URL'),
-                env('WOO_KEY'),
-                env('WOO_SECRET'),
-                ['version' => 'wc/v3', 'verify_ssl' => false, 'timeout' => 60]
+                $wooUrl,
+                $wooKey,
+                $wooSecret,
+                ['version' => 'wc/v3', 'verify_ssl' => true, 'timeout' => 60]
             );
 
             // Traemos 100 productos (puedes aumentar si necesitas más paginación)
@@ -72,6 +77,7 @@ class ListProducts extends ListRecords
             
             $processedWooIds = []; // Lista para rastrear qué IDs siguen vivos
 
+            $count = 0;
             foreach ($wooProducts as $item) {
                 // A. PRODUCTOS VARIABLES
                 if ($item->type === 'variable') {
@@ -85,16 +91,17 @@ class ListProducts extends ListRecords
                             ['woocommerce_product_id' => $variation->id],
                             [
                                 'name' => $variationName,
-                                'price' => $variation->price ?: 0,
-                                'sku' => $variation->sku,
-                                'type' => 'digital_product',
+                                'price' => floatval($variation->price ?: 0),
+                                'sku' => $variation->sku ?: '',
+                                'type' => 'store', // Artículos de tienda
                                 'is_active' => $isActive,
                                 'deleted_at' => null, // Restaurar si estaba borrado
                             ]
                         );
                         $processedWooIds[] = $variation->id;
+                        $count++;
                     }
-                } 
+                }
                 // B. PRODUCTOS SIMPLES
                 else {
                     $isActive = ($item->status === 'publish' && ($item->stock_status ?? 'instock') === 'instock');
@@ -102,29 +109,31 @@ class ListProducts extends ListRecords
                         ['woocommerce_product_id' => $item->id],
                         [
                             'name' => $item->name,
-                            'price' => $item->price ?: 0,
-                            'sku' => $item->sku,
-                            'type' => 'digital_product',
+                            'price' => floatval($item->price ?: 0),
+                            'sku' => $item->sku ?: '',
+                            'type' => 'store', // Artículos de tienda
                             'is_active' => $isActive,
                             'deleted_at' => null,
                         ]
                     );
                     $processedWooIds[] = $item->id;
+                    $count++;
                 }
             }
 
             // C. LIMPIEZA (Soft Delete)
             // Borramos los productos locales que tienen ID de Woo pero NO llegaron en esta sincronización
+            $deleted = 0;
             if (count($processedWooIds) > 0) {
-                Product::whereNotNull('woocommerce_product_id')
+                $deleted = Product::whereNotNull('woocommerce_product_id')
                     ->whereNotIn('woocommerce_product_id', $processedWooIds)
                     ->delete();
             }
 
-            $this->notifySuccess('WooCommerce sincronizado correctamente.');
+            $this->notifySuccess("✅ Sincronización completada: {$count} productos importados/actualizados" . ($deleted > 0 ? ", {$deleted} eliminados" : ""));
 
         } catch (\Exception $e) {
-            $this->notifyError($e->getMessage());
+            $this->notifyError('Error de sincronización: ' . $e->getMessage());
         }
     }
 

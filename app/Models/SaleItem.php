@@ -9,10 +9,17 @@ class SaleItem extends Model
 {
     use HasFactory;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'sale_id',
+        'product_id',
+        'quantity',
+        'unit_price',
+        'total_price',
+        'metadata_values',
+    ];
 
     protected $casts = [
-        'metadata_values' => 'array', // Importante para guardar los datos del cliente
+        'metadata_values' => 'array',
         'unit_price' => 'decimal:2',
         'total_price' => 'decimal:2',
     ];

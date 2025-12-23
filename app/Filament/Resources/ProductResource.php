@@ -19,6 +19,25 @@ class ProductResource extends Resource
     protected static ?string $modelLabel = 'Producto/Servicio';
     protected static ?string $navigationGroup = 'Gestión';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['name', 'sku'];
+    }
+
+    public static function getGlobalSearchResultTitle($record): string
+    {
+        return $record->name;
+    }
+
+    public static function getGlobalSearchResultDetails($record): array
+    {
+        $details = ['Precio' => '$' . number_format($record->price, 2)];
+        if ($record->sku) {
+            $details['SKU'] = $record->sku;
+        }
+        return $details;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -28,30 +47,41 @@ class ProductResource extends Resource
                         Forms\Components\TextInput::make('name')
                             ->label('Nombre del Artículo / Servicio')
                             ->required()
+                            ->minLength(3)
+                            ->maxLength(255)
+                            ->placeholder('Ejemplo: VPS Cloud 2GB RAM')
                             ->columnSpanFull(),
-                        
+
                         Forms\Components\Grid::make(3)
                             ->schema([
                                 Forms\Components\TextInput::make('price')
                                     ->label('Precio Venta')
                                     ->numeric()
                                     ->prefix('$')
-                                    ->required(),
-                                    
+                                    ->required()
+                                    ->minValue(0.01)
+                                    ->step(0.01)
+                                    ->placeholder('0.00')
+                                    ->validationMessages([
+                                        'min' => 'El precio debe ser mayor a 0.',
+                                    ]),
+
                                 Forms\Components\Select::make('type')
                                     ->label('Tipo')
                                     ->options([
-                                        'digital_product' => 'Artículo Tienda', // Mapeado para WooCommerce
+                                        'digital_product' => 'Artículo Tienda',
                                         'service' => 'Servicio Servidor',
                                         'server_credit' => 'Crédito Servidor',
                                     ])
                                     ->default('digital_product')
-                                    ->required(),
+                                    ->required()
+                                    ->native(false),
 
                                 Forms\Components\TextInput::make('sku')
                                     ->label('SKU (Código)')
                                     ->placeholder('Sincronizable con Tienda')
-                                    ->maxLength(255),
+                                    ->maxLength(255)
+                                    ->alphaDash(),
                             ]),
                             
                         Forms\Components\Toggle::make('is_active')
@@ -84,11 +114,14 @@ class ProductResource extends Resource
                         'service' => 'warning',
                         'server_credit' => 'info',
                         'digital_product' => 'success',
+                        'store' => 'primary',
+                        default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'service' => 'Servicio Servidor',
                         'server_credit' => 'Crédito Servidor',
                         'digital_product' => 'Artículo Tienda',
+                        'store' => 'Tienda',
                         default => $state,
                     }),
 
@@ -101,17 +134,33 @@ class ProductResource extends Resource
                     ->label('Disp.')
                     ->boolean(),
             ])
+            ->defaultSort('type', 'asc') // Ordenar por tipo: store primero, luego service, luego server_credit
             ->filters([
                 Tables\Filters\SelectFilter::make('type')
+                    ->label('Tipo de Producto')
                     ->options([
-                        'digital_product' => 'Tienda',
-                        'service' => 'Servicio',
-                        'server_credit' => 'Crédito',
+                        'store' => '🏪 Tienda (WooCommerce)',
+                        'digital_product' => '📦 Artículo Digital',
+                        'service' => '🖥️ Servicio Servidor',
+                        'server_credit' => '💳 Crédito Servidor',
                     ]),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->requiresConfirmation()
+                    ->modalHeading('Eliminar Producto/Servicio')
+                    ->modalDescription('¿Está seguro que desea eliminar este producto/servicio?')
+                    ->modalSubmitActionLabel('Sí, eliminar'),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->requiresConfirmation()
+                        ->modalHeading('Eliminar Productos/Servicios')
+                        ->modalDescription('¿Está seguro que desea eliminar los productos/servicios seleccionados?')
+                        ->modalSubmitActionLabel('Sí, eliminar todos'),
+                ]),
             ]);
     }
 

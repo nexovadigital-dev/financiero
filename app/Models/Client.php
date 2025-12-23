@@ -9,6 +9,14 @@ class Client extends Model
 {
     use HasFactory;
 
-    // Esto permite guardar todos los campos sin restricciones
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'email',
+        'phone',
+    ];
+
+    public function sales()
+    {
+        return $this->hasMany(Sale::class);
+    }
 }

@@ -1,2 +1,37 @@
+# SITIO PRIVADO - NO INDEXAR
+# Este es un sistema de gestión interna
+# El acceso no autorizado está prohibido y es monitoreado
+
 User-agent: *
-Disallow:
+Disallow: /
+
+# Bloquear todos los crawlers conocidos
+User-agent: Googlebot
+Disallow: /
+
+User-agent: Bingbot
+Disallow: /
+
+User-agent: Yahoo! Slurp
+Disallow: /
+
+User-agent: DuckDuckBot
+Disallow: /
+
+User-agent: Baiduspider
+Disallow: /
+
+User-agent: YandexBot
+Disallow: /
+
+User-agent: Sogou
+Disallow: /
+
+User-agent: Exabot
+Disallow: /
+
+User-agent: facebot
+Disallow: /
+
+User-agent: ia_archiver
+Disallow: /

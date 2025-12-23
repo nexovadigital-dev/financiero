@@ -1,0 +1,154 @@
+/* ==================================
+   CONFIGURACIONES BÁSICAS
+   ================================== */
+
+/* Barra de progreso de carga de página */
+#nprogress .bar {
+    height: 4px !important;
+    background: #7cbd2b !important;
+}
+
+#nprogress .peg {
+    box-shadow: 0 0 10px #7cbd2b, 0 0 5px #7cbd2b !important;
+}
+
+/* Spinner de carga */
+#nprogress .spinner-icon {
+    border-top-color: #7cbd2b !important;
+    border-left-color: #7cbd2b !important;
+    width: 24px !important;
+    height: 24px !important;
+    border-width: 3px !important;
+}
+
+/* ==================================
+   CORRECCIONES DE LAYOUT Y Z-INDEX
+   ================================== */
+
+/* JERARQUÍA DE Z-INDEX:
+   - Widgets/Cards: 1
+   - Formularios: 500-600
+   - Dropdowns/Modales: 999999
+*/
+
+/* Widgets y estadísticas - NIVEL MÁS BAJO */
+.fi-wi,
+.fi-wi-stats-overview,
+.fi-wi-stats-overview-stat,
+.fi-page-header-widgets,
+.fi-page-header-ctn {
+    z-index: 1 !important;
+}
+
+/* Formularios - NIVEL MEDIO */
+.fi-fo {
+    z-index: 500 !important;
+}
+
+.fi-fo-section {
+    margin-bottom: 2rem !important;
+    z-index: 500 !important;
+}
+
+.fi-section-content-ctn {
+    z-index: 500 !important;
+}
+
+.fi-fo .fi-grid {
+    z-index: 500 !important;
+}
+
+/* Campos de formulario */
+.fi-fo-field-wrp {
+    z-index: 600 !important;
+}
+
+.fi-fo-field-wrp select,
+.fi-select-button,
+.fi-input-wrp {
+    z-index: 600 !important;
+}
+
+/* DROPDOWNS - NIVEL MÁS ALTO */
+div[role="listbox"],
+ul[role="listbox"],
+[data-fi-select-options],
+.fi-select-options,
+[x-data*="select"] > div[role="listbox"],
+[x-data*="select"] .fi-select-list,
+.fi-fo-select-options-container,
+.fi-dropdown-panel,
+.choices__list--dropdown,
+.fi-select-dropdown,
+[x-data*="select"] ul,
+[x-data] [role="menu"],
+[x-data] [role="listbox"] {
+    z-index: 999999 !important;
+}
+
+/* Calendarios */
+.flatpickr-calendar,
+.flatpickr-months,
+.flatpickr-innerContainer {
+    z-index: 999999 !important;
+}
+
+/* Modales de confirmación */
+.fi-modal,
+.fi-modal-window,
+[role="dialog"],
+[role="alertdialog"] {
+    z-index: 999999 !important;
+}
+
+/* ==================================
+   MEJORAS VISUALES (SIN ANIMACIONES)
+   ================================== */
+
+/* Espaciado entre widgets */
+.fi-wi {
+    margin-bottom: 1.5rem;
+}
+
+/* Action Groups - Botones más amplios */
+.fi-ac-group-btn {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    min-width: fit-content !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
+
+/* Dropdown de Action Groups */
+.fi-ac-group-dropdown {
+    min-width: 250px !important;
+}
+
+/* Botones de header actions con mejor espaciado */
+.fi-page-header-actions {
+    gap: 0.75rem !important;
+}
+
+.fi-page-header-actions .fi-btn {
+    white-space: nowrap !important;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #7cbd2b;
+}

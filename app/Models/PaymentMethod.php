@@ -9,6 +9,13 @@ class PaymentMethod extends Model
 {
     use HasFactory;
 
-    // Esto permite guardar todos los campos sin restricciones
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'currency',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 }

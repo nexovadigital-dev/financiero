@@ -8,9 +8,17 @@ use Illuminate\Database\Eloquent\SoftDeletes; // Importar SoftDeletes
 
 class Product extends Model
 {
-    use HasFactory, SoftDeletes; // Usar el Trait
+    use HasFactory, SoftDeletes;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'price',
+        'type',
+        'required_metadata',
+        'woocommerce_product_id',
+        'sku',
+        'is_active',
+    ];
 
     protected $casts = [
         'required_metadata' => 'array',
