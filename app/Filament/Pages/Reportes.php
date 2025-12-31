@@ -65,6 +65,24 @@ class Reportes extends Page implements HasForms, HasTable
         $this->resetTable();
     }
 
+    // Helper para parsear fechas correctamente
+    protected function parseDate($date): ?string
+    {
+        if (empty($date)) {
+            return null;
+        }
+
+        if ($date instanceof \Carbon\Carbon) {
+            return $date->format('Y-m-d');
+        }
+
+        try {
+            return \Carbon\Carbon::parse($date)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
     public function form(Form $form): Form
     {
         return $form
@@ -189,11 +207,15 @@ class Reportes extends Page implements HasForms, HasTable
                 $query->where('status', 'completed');
                 $query->where('currency', $this->activeTab);
 
-                if (! empty($data['start_date'])) {
-                    $query->whereDate('sale_date', '>=', $data['start_date']);
+                // Aplicar filtros de fecha
+                $startDate = $this->parseDate($data['start_date']);
+                $endDate = $this->parseDate($data['end_date']);
+
+                if ($startDate) {
+                    $query->whereDate('sale_date', '>=', $startDate);
                 }
-                if (! empty($data['end_date'])) {
-                    $query->whereDate('sale_date', '<=', $data['end_date']);
+                if ($endDate) {
+                    $query->whereDate('sale_date', '<=', $endDate);
                 }
                 if (! empty($data['source']) && $data['source'] !== 'all') {
                     $query->where('source', $data['source']);
@@ -309,10 +331,13 @@ class Reportes extends Page implements HasForms, HasTable
 
     protected function calculateTotalCosts(): float
     {
+        $startDate = $this->parseDate($this->filters['start_date']);
+        $endDate = $this->parseDate($this->filters['end_date']);
+
         return Sale::query()
             ->where('currency', $this->activeTab)
-            ->when(! empty($this->filters['start_date']), fn ($q) => $q->whereDate('sale_date', '>=', $this->filters['start_date']))
-            ->when(! empty($this->filters['end_date']), fn ($q) => $q->whereDate('sale_date', '<=', $this->filters['end_date']))
+            ->when($startDate, fn ($q) => $q->whereDate('sale_date', '>=', $startDate))
+            ->when($endDate, fn ($q) => $q->whereDate('sale_date', '<=', $endDate))
             ->when(! empty($this->filters['source']) && $this->filters['source'] !== 'all', fn ($q) => $q->where('source', $this->filters['source']))
             ->when(! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all', fn ($q) => $q->whereHas('items.product', fn ($sq) => $sq->where('type', $this->filters['product_type'])))
             ->when(! empty($this->filters['payment_method_id']) && $this->filters['payment_method_id'] !== 'all', fn ($q) => $q->where('payment_method_id', $this->filters['payment_method_id']))
@@ -326,10 +351,13 @@ class Reportes extends Page implements HasForms, HasTable
 
     protected function calculateTotalProfit(): float
     {
+        $startDate = $this->parseDate($this->filters['start_date']);
+        $endDate = $this->parseDate($this->filters['end_date']);
+
         $sales = Sale::query()
             ->where('currency', $this->activeTab)
-            ->when(! empty($this->filters['start_date']), fn ($q) => $q->whereDate('sale_date', '>=', $this->filters['start_date']))
-            ->when(! empty($this->filters['end_date']), fn ($q) => $q->whereDate('sale_date', '<=', $this->filters['end_date']))
+            ->when($startDate, fn ($q) => $q->whereDate('sale_date', '>=', $startDate))
+            ->when($endDate, fn ($q) => $q->whereDate('sale_date', '<=', $endDate))
             ->when(! empty($this->filters['source']) && $this->filters['source'] !== 'all', fn ($q) => $q->where('source', $this->filters['source']))
             ->when(! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all', fn ($q) => $q->whereHas('items.product', fn ($sq) => $sq->where('type', $this->filters['product_type'])))
             ->when(! empty($this->filters['payment_method_id']) && $this->filters['payment_method_id'] !== 'all', fn ($q) => $q->where('payment_method_id', $this->filters['payment_method_id']))
@@ -348,8 +376,8 @@ class Reportes extends Page implements HasForms, HasTable
 
     public function getStatsForCurrency(string $currency): array
     {
-        $startDate = $this->filters['start_date'] ?? now()->startOfMonth();
-        $endDate = $this->filters['end_date'] ?? now();
+        $startDate = $this->parseDate($this->filters['start_date']) ?? now()->startOfMonth()->format('Y-m-d');
+        $endDate = $this->parseDate($this->filters['end_date']) ?? now()->format('Y-m-d');
 
         $query = Sale::query()
             ->where('currency', $currency)
