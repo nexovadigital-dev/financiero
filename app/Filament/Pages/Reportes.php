@@ -62,7 +62,12 @@ class Reportes extends Page implements HasTable, HasForms
                 Forms\Components\Section::make('Filtros Avanzados de Reporte')
                     ->description('Los datos se actualizan automáticamente. Todos los montos se muestran en USD para comparación universal.')
                     ->schema([
-                        Forms\Components\Grid::make(3)
+                        // Grid responsive: 1 col móvil, 2 tablet, 3 desktop
+                        Forms\Components\Grid::make([
+                            'default' => 1,
+                            'sm' => 2,
+                            'lg' => 3,
+                        ])
                             ->schema([
                                 Forms\Components\DatePicker::make('startDate')
                                     ->label('Fecha Inicio')
@@ -81,9 +86,9 @@ class Reportes extends Page implements HasTable, HasForms
                                 Forms\Components\Select::make('source')
                                     ->label('Origen de Venta')
                                     ->options([
-                                        'all' => '📊 Todos',
-                                        'store' => '🏪 Solo Tienda',
-                                        'server' => '🖥️ Solo Servidor',
+                                        'all' => 'Todos',
+                                        'store' => 'Solo Tienda',
+                                        'server' => 'Solo Servidor',
                                     ])
                                     ->default('all')
                                     ->required()
@@ -91,23 +96,49 @@ class Reportes extends Page implements HasTable, HasForms
                                     ->afterStateUpdated(fn () => $this->filterTable()),
                             ]),
 
-                        Forms\Components\Grid::make(2)
+                        // Grid responsive: 1 col móvil, 2 tablet
+                        Forms\Components\Grid::make([
+                            'default' => 1,
+                            'sm' => 2,
+                        ])
                             ->schema([
                                 Forms\Components\Select::make('payment_method_id')
                                     ->label('Método de Pago')
                                     ->placeholder('Todos los métodos')
                                     ->options(\App\Models\PaymentMethod::pluck('name', 'id'))
                                     ->searchable()
+                                    ->preload()
                                     ->live()
                                     ->afterStateUpdated(fn () => $this->filterTable()),
 
+                                // Búsqueda asíncrona para 6,000+ clientes
                                 Forms\Components\Select::make('client_id')
-                                    ->label('Cliente Específico')
-                                    ->placeholder('Todos los clientes')
-                                    ->options(\App\Models\Client::pluck('name', 'id'))
+                                    ->label('Buscar Cliente')
+                                    ->placeholder('Escriba para buscar...')
                                     ->searchable()
+                                    ->searchDebounce(300)
+                                    ->searchPrompt('Escriba al menos 2 caracteres...')
+                                    ->noSearchResultsMessage('No se encontraron clientes')
+                                    ->getSearchResultsUsing(function (string $search): array {
+                                        if (strlen($search) < 2) {
+                                            return [];
+                                        }
+
+                                        return \App\Models\Client::query()
+                                            ->where('name', 'like', "%{$search}%")
+                                            ->orWhere('email', 'like', "%{$search}%")
+                                            ->orWhere('phone', 'like', "%{$search}%")
+                                            ->orderBy('name')
+                                            ->limit(50)
+                                            ->pluck('name', 'id')
+                                            ->toArray();
+                                    })
+                                    ->getOptionLabelUsing(fn ($value): ?string =>
+                                        \App\Models\Client::find($value)?->name
+                                    )
                                     ->live()
-                                    ->afterStateUpdated(fn () => $this->filterTable()),
+                                    ->afterStateUpdated(fn () => $this->filterTable())
+                                    ->helperText('Busca por nombre, email o teléfono'),
                             ]),
                     ])
                     ->collapsible(),
