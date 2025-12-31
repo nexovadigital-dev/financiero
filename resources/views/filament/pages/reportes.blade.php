@@ -1,5 +1,5 @@
 <x-filament-panels::page>
-    {{-- CSS para arreglar z-index del menú móvil y mejorar responsive --}}
+    {{-- CSS para arreglar z-index del menú móvil --}}
     <style>
         /* Asegurar que el sidebar móvil tenga z-index alto */
         .fi-sidebar {
@@ -38,13 +38,6 @@
                 z-index: 55 !important;
             }
         }
-
-        /* Mejoras responsive para los filtros */
-        @media (max-width: 640px) {
-            .fi-fo-field-wrp {
-                margin-bottom: 0.5rem;
-            }
-        }
     </style>
 
     {{-- 1. FILTROS --}}
@@ -55,15 +48,7 @@
     </div>
 
     {{-- 2. WIDGETS DE ESTADÍSTICAS --}}
-    <div class="mb-6 relative">
-        {{-- Indicador de carga que se oculta correctamente --}}
-        <div wire:loading wire:target="filters" class="absolute inset-0 bg-white/50 dark:bg-gray-900/50 flex items-center justify-center rounded-lg" style="z-index: 5;">
-            <div class="flex items-center gap-2 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-lg">
-                <x-filament::loading-indicator class="h-5 w-5" />
-                <span class="text-sm text-gray-600 dark:text-gray-400">Actualizando...</span>
-            </div>
-        </div>
-
+    <div class="mb-6">
         <x-filament-widgets::widgets
             :widgets="$this->getHeaderWidgets()"
             :columns="$this->getHeaderWidgetsColumns()"

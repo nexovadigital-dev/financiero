@@ -59,12 +59,18 @@ class Reportes extends Page implements HasForms, HasTable
         $this->filters['currency'] = $value;
     }
 
+    // Método para aplicar filtros manualmente
+    public function applyFilters(): void
+    {
+        $this->resetTable();
+    }
+
     public function form(Form $form): Form
     {
         return $form
             ->schema([
                 Forms\Components\Section::make('Filtros de Reporte')
-                    ->description('Filtra las ventas según los criterios seleccionados.')
+                    ->description('Selecciona los filtros y presiona "Aplicar Filtros".')
                     ->schema([
                         // Fechas - 2 columnas
                         Forms\Components\Grid::make(2)
@@ -74,23 +80,21 @@ class Reportes extends Page implements HasForms, HasTable
                                     ->required()
                                     ->default(now()->startOfMonth())
                                     ->native(false)
-                                    ->closeOnDateSelection()
-                                    ->live(debounce: 500),
+                                    ->closeOnDateSelection(),
 
                                 Forms\Components\DatePicker::make('end_date')
                                     ->label('Fecha Fin')
                                     ->required()
                                     ->default(now())
                                     ->native(false)
-                                    ->closeOnDateSelection()
-                                    ->live(debounce: 500),
+                                    ->closeOnDateSelection(),
                             ]),
 
-                        // Filtros principales - 4 columnas en desktop, 2 en tablet, 1 en móvil
+                        // Filtros principales - 3 columnas en desktop, 2 en tablet, 1 en móvil
                         Forms\Components\Grid::make([
                             'default' => 1,
                             'sm' => 2,
-                            'lg' => 4,
+                            'lg' => 3,
                         ])
                             ->schema([
                                 Forms\Components\Select::make('source')
@@ -100,8 +104,7 @@ class Reportes extends Page implements HasForms, HasTable
                                         'store' => 'Tienda',
                                         'server' => 'Servidor',
                                     ])
-                                    ->default('all')
-                                    ->live(debounce: 300),
+                                    ->default('all'),
 
                                 Forms\Components\Select::make('product_type')
                                     ->label('Tipo de Producto')
@@ -111,8 +114,7 @@ class Reportes extends Page implements HasForms, HasTable
                                         'service' => 'Servicios',
                                         'server_credit' => 'Créditos',
                                     ])
-                                    ->default('all')
-                                    ->live(debounce: 300),
+                                    ->default('all'),
 
                                 Forms\Components\Select::make('payment_method_id')
                                     ->label('Método de Pago')
@@ -120,9 +122,7 @@ class Reportes extends Page implements HasForms, HasTable
                                         $methods = \App\Models\PaymentMethod::pluck('name', 'id')->toArray();
                                         return ['all' => 'Todos los métodos'] + $methods;
                                     })
-                                    ->default('all')
-                                    ->live(debounce: 300),
-
+                                    ->default('all'),
                             ]),
 
                         // Búsqueda de cliente con búsqueda async
@@ -146,14 +146,22 @@ class Reportes extends Page implements HasForms, HasTable
                                     ->toArray();
                             })
                             ->getOptionLabelUsing(fn ($value): ?string =>
-                                $value === 'all' ? 'Todos los clientes' : \App\Models\Client::find($value)?->name
+                                \App\Models\Client::find($value)?->name
                             )
                             ->placeholder('Buscar cliente por nombre, email o teléfono...')
-                            ->allowHtml()
-                            ->live(debounce: 300)
                             ->nullable()
                             ->default(null)
                             ->helperText('Escribe para buscar entre 6,000+ clientes'),
+
+                        // Botón para aplicar filtros
+                        Forms\Components\Actions::make([
+                            Forms\Components\Actions\Action::make('aplicar_filtros')
+                                ->label('Aplicar Filtros')
+                                ->icon('heroicon-m-funnel')
+                                ->color('primary')
+                                ->size('lg')
+                                ->action('applyFilters'),
+                        ])->columnSpanFull(),
                     ])
                     ->collapsed(false)
                     ->collapsible(),
