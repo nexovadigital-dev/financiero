@@ -1,6 +1,34 @@
 <x-filament-panels::page>
+    {{-- CSS para arreglar z-index del menú móvil --}}
+    <style>
+        /* Asegurar que el sidebar móvil tenga z-index alto */
+        .fi-sidebar-nav {
+            z-index: 50 !important;
+        }
+
+        /* El overlay del sidebar debe estar por encima de dropdowns */
+        .fi-sidebar-close-overlay {
+            z-index: 45 !important;
+        }
+
+        /* Los dropdowns de select deben tener z-index menor al sidebar */
+        .fi-fo-select .choices__list--dropdown,
+        .fi-fo-select .fi-select-dropdown,
+        [data-headlessui-state] {
+            z-index: 40 !important;
+        }
+
+        /* En móvil, cuando el sidebar está abierto, bajar z-index de formularios */
+        @media (max-width: 1023px) {
+            .fi-sidebar[data-open="true"] ~ .fi-main .fi-fo-select .choices__list--dropdown,
+            .fi-sidebar[data-open="true"] ~ .fi-main [data-headlessui-state] {
+                z-index: 30 !important;
+            }
+        }
+    </style>
+
     {{-- 1. FILTROS --}}
-    <div>
+    <div class="relative" style="z-index: 10;">
         <x-filament-panels::form>
             {{ $this->form }}
         </x-filament-panels::form>
