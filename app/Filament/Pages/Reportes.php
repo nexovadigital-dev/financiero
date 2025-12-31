@@ -2,116 +2,148 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\IngresosChart;
+use App\Filament\Widgets\MetodosPagoChart;
+use App\Models\Currency;
 use App\Models\Sale;
+use Filament\Forms;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Forms\Form;
 use Filament\Pages\Page;
+use Filament\Tables;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
-use Filament\Tables;
-use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Forms\Contracts\HasForms;
 use Illuminate\Database\Eloquent\Builder;
 use pxlrbt\FilamentExcel\Actions\Tables\ExportAction;
 use pxlrbt\FilamentExcel\Exports\ExcelExport;
-use pxlrbt\FilamentExcel\Columns\Column;
-use App\Filament\Widgets\IngresosChart;
-use App\Filament\Widgets\MetodosPagoChart;
-use App\Filament\Widgets\FinancialStats; // Importamos el nuevo widget financiero
 
-class Reportes extends Page implements HasTable, HasForms
+class Reportes extends Page implements HasForms, HasTable
 {
-    use InteractsWithTable;
     use InteractsWithForms;
+    use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-presentation-chart-line';
+
     protected static ?string $navigationLabel = 'Reportes Financieros';
-    protected static ?string $title = 'Panel de Reportes Avanzados';
+
+    protected static ?string $title = 'Reportes Financieros Avanzados';
+
     protected static ?string $navigationGroup = 'Gestión';
-    
-    // Vista personalizada
+
     protected static string $view = 'filament.pages.reportes';
 
-    // Estado de los filtros
     public ?array $filters = [
-        'startDate' => null,
-        'endDate' => null,
+        'start_date' => null,
+        'end_date' => null,
+        'currency' => 'USD',
         'source' => 'all',
-        'payment_method_id' => null,
+        'payment_method_id' => 'all',
         'client_id' => null,
+        'product_type' => 'all',
+        'supplier_id' => 'all',
     ];
+
+    public string $activeTab = 'USD';
 
     public function mount(): void
     {
-        // Valores iniciales (Mes actual)
-        $this->form->fill([
-            'startDate' => now()->startOfMonth(),
-            'endDate' => now()->endOfDay(),
-            'source' => 'all',
-            'payment_method_id' => null,
-            'client_id' => null,
-        ]);
+        // SIEMPRE usar USD como default
+        $this->activeTab = 'USD';
+        $this->filters['currency'] = 'USD';
+        $this->filters['start_date'] = now()->startOfMonth();
+        $this->filters['end_date'] = now()->endOfDay();
     }
 
-    // --- 1. FORMULARIO REACTIVO (LIVE) ---
+    public function updatedActiveTab($value): void
+    {
+        $this->filters['currency'] = $value;
+    }
+
     public function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Filtros Avanzados de Reporte')
-                    ->description('Los datos se actualizan automáticamente. Todos los montos se muestran en USD para comparación universal.')
+                Forms\Components\Section::make('Filtros de Reporte')
+                    ->description('Filtra las ventas según los criterios seleccionados.')
                     ->schema([
-                        // Grid responsive: 1 col móvil, 2 tablet, 3 desktop
-                        Forms\Components\Grid::make([
-                            'default' => 1,
-                            'sm' => 2,
-                            'lg' => 3,
-                        ])
-                            ->schema([
-                                Forms\Components\DatePicker::make('startDate')
-                                    ->label('Fecha Inicio')
-                                    ->required()
-                                    ->default(now()->startOfMonth())
-                                    ->live()
-                                    ->afterStateUpdated(fn () => $this->filterTable()),
-
-                                Forms\Components\DatePicker::make('endDate')
-                                    ->label('Fecha Fin')
-                                    ->required()
-                                    ->default(now())
-                                    ->live()
-                                    ->afterStateUpdated(fn () => $this->filterTable()),
-
-                                Forms\Components\Select::make('source')
-                                    ->label('Origen de Venta')
-                                    ->options([
-                                        'all' => 'Todos',
-                                        'store' => 'Solo Tienda',
-                                        'server' => 'Solo Servidor',
-                                    ])
-                                    ->default('all')
-                                    ->required()
-                                    ->live()
-                                    ->afterStateUpdated(fn () => $this->filterTable()),
-                            ]),
-
                         // Grid responsive: 1 col móvil, 2 tablet
                         Forms\Components\Grid::make([
                             'default' => 1,
                             'sm' => 2,
                         ])
                             ->schema([
+                                Forms\Components\DatePicker::make('start_date')
+                                    ->label('Fecha Inicio')
+                                    ->required()
+                                    ->default(now()->startOfMonth())
+                                    ->native(false)
+                                    ->live(onBlur: true),
+
+                                Forms\Components\DatePicker::make('end_date')
+                                    ->label('Fecha Fin')
+                                    ->required()
+                                    ->default(now())
+                                    ->native(false)
+                                    ->live(onBlur: true),
+                            ]),
+
+                        // Grid responsive: 1 col móvil, 2 tablet, 4 desktop
+                        Forms\Components\Grid::make([
+                            'default' => 1,
+                            'sm' => 2,
+                            'lg' => 4,
+                        ])
+                            ->schema([
+                                Forms\Components\Select::make('source')
+                                    ->label('Origen de Venta')
+                                    ->options([
+                                        'all' => 'Todos los orígenes',
+                                        'store' => 'Tienda',
+                                        'server' => 'Servidor',
+                                    ])
+                                    ->default('all')
+                                    ->live(),
+
+                                Forms\Components\Select::make('product_type')
+                                    ->label('Tipo de Producto')
+                                    ->options([
+                                        'all' => 'Todos los tipos',
+                                        'digital_product' => 'Artículos',
+                                        'service' => 'Servicios',
+                                        'server_credit' => 'Créditos',
+                                    ])
+                                    ->default('all')
+                                    ->live(),
+
                                 Forms\Components\Select::make('payment_method_id')
                                     ->label('Método de Pago')
-                                    ->placeholder('Todos los métodos')
-                                    ->options(\App\Models\PaymentMethod::pluck('name', 'id'))
-                                    ->searchable()
-                                    ->preload()
-                                    ->live()
-                                    ->afterStateUpdated(fn () => $this->filterTable()),
+                                    ->options(function () {
+                                        $methods = \App\Models\PaymentMethod::pluck('name', 'id')->toArray();
 
-                                // Búsqueda asíncrona para 6,000+ clientes
+                                        return ['all' => 'Todos los métodos'] + $methods;
+                                    })
+                                    ->default('all')
+                                    ->live(),
+
+                                Forms\Components\Select::make('supplier_id')
+                                    ->label('Proveedor')
+                                    ->options(function () {
+                                        $suppliers = \App\Models\Supplier::pluck('name', 'id')->toArray();
+
+                                        return ['all' => 'Todos los proveedores'] + $suppliers;
+                                    })
+                                    ->default('all')
+                                    ->live(),
+                            ]),
+
+                        // Búsqueda asíncrona de clientes (6,000+ registros)
+                        Forms\Components\Grid::make([
+                            'default' => 1,
+                            'sm' => 2,
+                        ])
+                            ->schema([
                                 Forms\Components\Select::make('client_id')
                                     ->label('Buscar Cliente')
                                     ->placeholder('Escriba para buscar...')
@@ -137,77 +169,85 @@ class Reportes extends Page implements HasTable, HasForms
                                         \App\Models\Client::find($value)?->name
                                     )
                                     ->live()
-                                    ->afterStateUpdated(fn () => $this->filterTable())
                                     ->helperText('Busca por nombre, email o teléfono'),
                             ]),
                     ])
+                    ->collapsed(false)
                     ->collapsible(),
             ])
             ->statePath('filters');
     }
 
-    // --- 2. WIDGETS ---
     protected function getHeaderWidgets(): array
     {
         return [
-            // El resumen financiero va PRIMERO para que salga arriba
-            FinancialStats::class,
-            
-            // Luego los gráficos
             IngresosChart::class,
             MetodosPagoChart::class,
         ];
     }
 
-    // --- 3. TABLA ---
     public function table(Table $table): Table
     {
         return $table
             ->query(Sale::query())
-            // Aplicar filtros avanzados
             ->modifyQueryUsing(function (Builder $query) {
                 $data = $this->filters;
 
-                // Filtro por fecha
-                if ($data['startDate'] ?? null) {
-                    $query->whereDate('sale_date', '>=', $data['startDate']);
-                }
-                if ($data['endDate'] ?? null) {
-                    $query->whereDate('sale_date', '<=', $data['endDate']);
-                }
+                $query->with(['client', 'paymentMethod', 'items.product', 'pricePackage', 'supplier']);
+                $query->whereNull('refunded_at');
+                $query->where('status', 'completed');
+                $query->where('currency', $this->activeTab);
 
-                // Filtro por origen (tienda/servidor)
-                if (($data['source'] ?? 'all') !== 'all') {
+                if (! empty($data['start_date'])) {
+                    $query->whereDate('sale_date', '>=', $data['start_date']);
+                }
+                if (! empty($data['end_date'])) {
+                    $query->whereDate('sale_date', '<=', $data['end_date']);
+                }
+                if (! empty($data['source']) && $data['source'] !== 'all') {
                     $query->where('source', $data['source']);
                 }
-
-                // Filtro por método de pago
-                if ($data['payment_method_id'] ?? null) {
+                if (! empty($data['payment_method_id']) && $data['payment_method_id'] !== 'all') {
                     $query->where('payment_method_id', $data['payment_method_id']);
                 }
-
-                // Filtro por cliente específico
-                if ($data['client_id'] ?? null) {
+                // Filtro por cliente - ahora usa null en vez de 'all'
+                if (! empty($data['client_id'])) {
                     $query->where('client_id', $data['client_id']);
                 }
-
-                // Solo ventas completadas
-                $query->where('status', 'completed');
+                if (! empty($data['supplier_id']) && $data['supplier_id'] !== 'all') {
+                    $query->where('supplier_id', $data['supplier_id']);
+                }
+                if (! empty($data['product_type']) && $data['product_type'] !== 'all') {
+                    $query->whereHas('items.product', function ($q) use ($data) {
+                        $q->where('type', $data['product_type']);
+                    });
+                }
             })
             ->columns([
                 Tables\Columns\TextColumn::make('id')
-                    ->label('ID')
+                    ->label('#')
                     ->sortable()
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->size('sm'),
 
                 Tables\Columns\TextColumn::make('sale_date')
                     ->label('Fecha')
                     ->dateTime('d/m/Y H:i')
-                    ->sortable(),
+                    ->sortable()
+                    ->size('sm'),
 
                 Tables\Columns\TextColumn::make('client.name')
                     ->label('Cliente')
-                    ->searchable(),
+                    ->searchable()
+                    ->limit(25)
+                    ->tooltip(fn ($record) => $record->client?->name),
+
+                Tables\Columns\TextColumn::make('items.product.name')
+                    ->label('Productos')
+                    ->listWithLineBreaks()
+                    ->limitList(2)
+                    ->expandableLimitedList()
+                    ->bulleted(),
 
                 Tables\Columns\TextColumn::make('source')
                     ->label('Origen')
@@ -222,63 +262,197 @@ class Reportes extends Page implements HasTable, HasForms
                 Tables\Columns\TextColumn::make('paymentMethod.name')
                     ->label('Método')
                     ->badge()
-                    ->color('info'),
-
-                Tables\Columns\TextColumn::make('currency')
-                    ->label('Divisa')
-                    ->badge()
-                    ->color('gray'),
+                    ->color('info')
+                    ->limit(15),
 
                 Tables\Columns\TextColumn::make('total_amount')
-                    ->label('Monto Original')
-                    ->money(fn ($record) => $record->currency)
-                    ->weight('medium'),
-
-                Tables\Columns\TextColumn::make('amount_usd')
-                    ->label('Monto USD')
-                    ->money('USD')
+                    ->label('Total')
+                    ->money(fn () => $this->activeTab)
                     ->weight('bold')
                     ->color('success')
-                    ->getStateUsing(fn ($record) => $record->amount_usd ?? $record->total_amount)
-                    ->summarize(Tables\Columns\Summarizers\Sum::make()->label('TOTAL USD')->money('USD')),
+                    ->summarize(Tables\Columns\Summarizers\Sum::make()
+                        ->label('TOTAL INGRESOS')
+                        ->money(fn () => $this->activeTab)),
 
-                Tables\Columns\IconColumn::make('manually_converted')
-                    ->label('Manual')
-                    ->boolean()
-                    ->trueIcon('heroicon-o-pencil')
-                    ->falseIcon('heroicon-o-calculator')
-                    ->tooltip(fn ($record) => $record->manually_converted ? 'Editado manualmente' : 'Calculado automáticamente'),
+                Tables\Columns\TextColumn::make('base_cost')
+                    ->label('Costo')
+                    ->money(fn () => $this->activeTab)
+                    ->color('warning')
+                    ->getStateUsing(fn ($record) => $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity)
+                    )
+                    ->summarize(Tables\Columns\Summarizers\Summarizer::make()
+                        ->label('TOTAL COSTOS')
+                        ->money(fn () => $this->activeTab)
+                        ->using(fn ($query) => $this->calculateTotalCosts())),
+
+                Tables\Columns\TextColumn::make('profit')
+                    ->label('Ganancia')
+                    ->money(fn () => $this->activeTab)
+                    ->weight('bold')
+                    ->color('success')
+                    ->getStateUsing(function ($record) {
+                        $total = $record->total_amount;
+                        $cost = $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity);
+
+                        return $total - $cost;
+                    })
+                    ->summarize(Tables\Columns\Summarizers\Summarizer::make()
+                        ->label('GANANCIA NETA')
+                        ->money(fn () => $this->activeTab)
+                        ->using(fn ($query) => $this->calculateTotalProfit())),
+
+                Tables\Columns\TextColumn::make('supplier.name')
+                    ->label('Proveedor')
+                    ->default('-')
+                    ->limit(20)
+                    ->toggleable()
+                    ->toggledHiddenByDefault(),
+
+                Tables\Columns\TextColumn::make('pricePackage.name')
+                    ->label('Paquete')
+                    ->badge()
+                    ->color('info')
+                    ->default('-')
+                    ->toggleable()
+                    ->toggledHiddenByDefault(),
             ])
             ->defaultSort('sale_date', 'desc')
             ->headerActions([
                 ExportAction::make()
-                    ->label('Exportar Excel/CSV')
+                    ->label('Exportar Excel')
                     ->color('success')
                     ->icon('heroicon-m-arrow-down-tray')
                     ->exports([
-                        ExcelExport::make()
+                        ExcelExport::make('completo')
+                            ->label('Reporte Completo')
                             ->fromTable()
-                            ->withFilename(fn () => 'Reporte_NicaGSM_' . date('Y-m-d_His'))
-                            ->askForWriterType()
-                            ->withColumns([
-                                Column::make('id')->heading('ID'),
-                                Column::make('sale_date')->heading('Fecha'),
-                                Column::make('client.name')->heading('Cliente'),
-                                Column::make('source')->heading('Origen'),
-                                Column::make('status')->heading('Estado'),
-                                Column::make('paymentMethod.name')->heading('Método de Pago'),
-                                Column::make('currency')->heading('Moneda'),
-                                Column::make('total_amount')->heading('Monto Original'),
-                                Column::make('amount_usd')->heading('Monto USD'),
-                                Column::make('exchange_rate_used')->heading('Tasa Usada'),
-                                Column::make('payment_reference')->heading('Referencia'),
-                            ]),
+                            ->withFilename(fn () => 'Reporte_'.$this->activeTab.'_'.date('Y-m-d_His')),
+
+                        ExcelExport::make('resumido')
+                            ->label('Reporte Resumido')
+                            ->fromTable()
+                            ->withFilename(fn () => 'Ventas_Resumen_'.$this->activeTab.'_'.date('Y-m-d')),
                     ]),
             ]);
     }
-    
-    public function filterTable()
+
+    protected function calculateTotalCosts(): float
     {
-        // Se ejecuta para refrescar componentes
+        return Sale::query()
+            ->where('currency', $this->activeTab)
+            ->when(! empty($this->filters['start_date']), fn ($q) => $q->whereDate('sale_date', '>=', $this->filters['start_date']))
+            ->when(! empty($this->filters['end_date']), fn ($q) => $q->whereDate('sale_date', '<=', $this->filters['end_date']))
+            ->when(! empty($this->filters['source']) && $this->filters['source'] !== 'all', fn ($q) => $q->where('source', $this->filters['source']))
+            ->when(! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all', fn ($q) => $q->whereHas('items.product', fn ($sq) => $sq->where('type', $this->filters['product_type']))
+            )
+            ->when(! empty($this->filters['payment_method_id']) && $this->filters['payment_method_id'] !== 'all', fn ($q) => $q->where('payment_method_id', $this->filters['payment_method_id']))
+            ->when(! empty($this->filters['supplier_id']) && $this->filters['supplier_id'] !== 'all', fn ($q) => $q->where('supplier_id', $this->filters['supplier_id']))
+            ->when(! empty($this->filters['client_id']), fn ($q) => $q->where('client_id', $this->filters['client_id']))
+            ->where('status', 'completed')
+            ->whereNull('refunded_at')
+            ->with('items')
+            ->get()
+            ->sum(fn ($sale) => $sale->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity));
+    }
+
+    protected function calculateTotalProfit(): float
+    {
+        $sales = Sale::query()
+            ->where('currency', $this->activeTab)
+            ->when(! empty($this->filters['start_date']), fn ($q) => $q->whereDate('sale_date', '>=', $this->filters['start_date']))
+            ->when(! empty($this->filters['end_date']), fn ($q) => $q->whereDate('sale_date', '<=', $this->filters['end_date']))
+            ->when(! empty($this->filters['source']) && $this->filters['source'] !== 'all', fn ($q) => $q->where('source', $this->filters['source']))
+            ->when(! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all', fn ($q) => $q->whereHas('items.product', fn ($sq) => $sq->where('type', $this->filters['product_type']))
+            )
+            ->when(! empty($this->filters['payment_method_id']) && $this->filters['payment_method_id'] !== 'all', fn ($q) => $q->where('payment_method_id', $this->filters['payment_method_id']))
+            ->when(! empty($this->filters['supplier_id']) && $this->filters['supplier_id'] !== 'all', fn ($q) => $q->where('supplier_id', $this->filters['supplier_id']))
+            ->when(! empty($this->filters['client_id']), fn ($q) => $q->where('client_id', $this->filters['client_id']))
+            ->where('status', 'completed')
+            ->whereNull('refunded_at')
+            ->with('items')
+            ->get();
+
+        return $sales->sum(function ($sale) {
+            $total = $sale->total_amount;
+            $cost = $sale->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity);
+
+            return $total - $cost;
+        });
+    }
+
+    public function getStatsForCurrency(string $currency): array
+    {
+        $startDate = $this->filters['start_date'] ?? now()->startOfMonth();
+        $endDate = $this->filters['end_date'] ?? now();
+
+        $query = Sale::query()
+            ->where('currency', $currency)
+            ->where('status', 'completed')
+            ->whereNull('refunded_at')
+            ->whereDate('sale_date', '>=', $startDate)
+            ->whereDate('sale_date', '<=', $endDate);
+
+        if (! empty($this->filters['source']) && $this->filters['source'] !== 'all') {
+            $query->where('source', $this->filters['source']);
+        }
+        if (! empty($this->filters['payment_method_id']) && $this->filters['payment_method_id'] !== 'all') {
+            $query->where('payment_method_id', $this->filters['payment_method_id']);
+        }
+        if (! empty($this->filters['supplier_id']) && $this->filters['supplier_id'] !== 'all') {
+            $query->where('supplier_id', $this->filters['supplier_id']);
+        }
+        if (! empty($this->filters['client_id'])) {
+            $query->where('client_id', $this->filters['client_id']);
+        }
+        if (! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all') {
+            $query->whereHas('items.product', function ($q) {
+                $q->where('type', $this->filters['product_type']);
+            });
+        }
+
+        $totalIngresos = $query->sum('total_amount');
+        $totalVentas = $query->count();
+
+        return [
+            'total_ingresos' => $totalIngresos,
+            'total_ventas' => $totalVentas,
+            'promedio_venta' => $totalVentas > 0 ? $totalIngresos / $totalVentas : 0,
+        ];
+    }
+
+    public function getActiveCurrencies(): array
+    {
+        $currencies = Currency::where('is_active', true)
+            ->pluck('name', 'code')
+            ->toArray();
+
+        // Ordenar: USD primero, NIO segundo, resto alfabético
+        $ordered = [];
+
+        if (isset($currencies['USD'])) {
+            $ordered['USD'] = $currencies['USD'];
+            unset($currencies['USD']);
+        }
+
+        if (isset($currencies['NIO'])) {
+            $ordered['NIO'] = $currencies['NIO'];
+            unset($currencies['NIO']);
+        }
+
+        // Agregar el resto ordenado alfabéticamente
+        ksort($currencies);
+
+        return array_merge($ordered, $currencies);
+    }
+
+    public function getCurrencySymbol(string $code): string
+    {
+        return match ($code) {
+            'USD' => '$',
+            'NIO' => 'C$',
+            'EUR' => '€',
+            'MXN' => 'MX$',
+            default => $code.' ',
+        };
     }
 }
