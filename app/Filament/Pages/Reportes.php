@@ -42,7 +42,6 @@ class Reportes extends Page implements HasForms, HasTable
         'payment_method_id' => 'all',
         'client_id' => null,
         'product_type' => 'all',
-        'supplier_id' => 'all',
     ];
 
     public string $activeTab = 'USD';
@@ -122,14 +121,6 @@ class Reportes extends Page implements HasForms, HasTable
                                     ->default('all')
                                     ->live(),
 
-                                Forms\Components\Select::make('supplier_id')
-                                    ->label('Proveedor')
-                                    ->options(function () {
-                                        $suppliers = \App\Models\Supplier::pluck('name', 'id')->toArray();
-                                        return ['all' => 'Todos los proveedores'] + $suppliers;
-                                    })
-                                    ->default('all')
-                                    ->live(),
                             ]),
 
                         // Búsqueda de cliente con búsqueda async
@@ -184,7 +175,7 @@ class Reportes extends Page implements HasForms, HasTable
             ->modifyQueryUsing(function (Builder $query) {
                 $data = $this->filters;
 
-                $query->with(['client', 'paymentMethod', 'items.product', 'pricePackage', 'supplier']);
+                $query->with(['client', 'paymentMethod', 'items.product']);
                 $query->whereNull('refunded_at');
                 $query->where('status', 'completed');
                 $query->where('currency', $this->activeTab);
@@ -203,9 +194,6 @@ class Reportes extends Page implements HasForms, HasTable
                 }
                 if (! empty($data['client_id'])) {
                     $query->where('client_id', $data['client_id']);
-                }
-                if (! empty($data['supplier_id']) && $data['supplier_id'] !== 'all') {
-                    $query->where('supplier_id', $data['supplier_id']);
                 }
                 if (! empty($data['product_type']) && $data['product_type'] !== 'all') {
                     $query->whereHas('items.product', function ($q) use ($data) {
@@ -289,20 +277,6 @@ class Reportes extends Page implements HasForms, HasTable
                         ->money(fn () => $this->activeTab)
                         ->using(fn ($query) => $this->calculateTotalProfit())),
 
-                Tables\Columns\TextColumn::make('supplier.name')
-                    ->label('Proveedor')
-                    ->default('-')
-                    ->limit(20)
-                    ->toggleable()
-                    ->toggledHiddenByDefault(),
-
-                Tables\Columns\TextColumn::make('pricePackage.name')
-                    ->label('Paquete')
-                    ->badge()
-                    ->color('info')
-                    ->default('-')
-                    ->toggleable()
-                    ->toggledHiddenByDefault(),
             ])
             ->defaultSort('sale_date', 'desc')
             ->headerActions([
@@ -333,7 +307,6 @@ class Reportes extends Page implements HasForms, HasTable
             ->when(! empty($this->filters['source']) && $this->filters['source'] !== 'all', fn ($q) => $q->where('source', $this->filters['source']))
             ->when(! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all', fn ($q) => $q->whereHas('items.product', fn ($sq) => $sq->where('type', $this->filters['product_type'])))
             ->when(! empty($this->filters['payment_method_id']) && $this->filters['payment_method_id'] !== 'all', fn ($q) => $q->where('payment_method_id', $this->filters['payment_method_id']))
-            ->when(! empty($this->filters['supplier_id']) && $this->filters['supplier_id'] !== 'all', fn ($q) => $q->where('supplier_id', $this->filters['supplier_id']))
             ->when(! empty($this->filters['client_id']), fn ($q) => $q->where('client_id', $this->filters['client_id']))
             ->where('status', 'completed')
             ->whereNull('refunded_at')
@@ -351,7 +324,6 @@ class Reportes extends Page implements HasForms, HasTable
             ->when(! empty($this->filters['source']) && $this->filters['source'] !== 'all', fn ($q) => $q->where('source', $this->filters['source']))
             ->when(! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all', fn ($q) => $q->whereHas('items.product', fn ($sq) => $sq->where('type', $this->filters['product_type'])))
             ->when(! empty($this->filters['payment_method_id']) && $this->filters['payment_method_id'] !== 'all', fn ($q) => $q->where('payment_method_id', $this->filters['payment_method_id']))
-            ->when(! empty($this->filters['supplier_id']) && $this->filters['supplier_id'] !== 'all', fn ($q) => $q->where('supplier_id', $this->filters['supplier_id']))
             ->when(! empty($this->filters['client_id']), fn ($q) => $q->where('client_id', $this->filters['client_id']))
             ->where('status', 'completed')
             ->whereNull('refunded_at')
@@ -382,9 +354,6 @@ class Reportes extends Page implements HasForms, HasTable
         }
         if (! empty($this->filters['payment_method_id']) && $this->filters['payment_method_id'] !== 'all') {
             $query->where('payment_method_id', $this->filters['payment_method_id']);
-        }
-        if (! empty($this->filters['supplier_id']) && $this->filters['supplier_id'] !== 'all') {
-            $query->where('supplier_id', $this->filters['supplier_id']);
         }
         if (! empty($this->filters['client_id'])) {
             $query->where('client_id', $this->filters['client_id']);
