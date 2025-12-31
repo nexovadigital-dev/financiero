@@ -1,5 +1,5 @@
 <x-filament-panels::page>
-    {{-- CSS para arreglar z-index del menú móvil --}}
+    {{-- CSS para arreglar z-index y problemas visuales --}}
     <style>
         /* Asegurar que el sidebar móvil tenga z-index alto */
         .fi-sidebar {
@@ -13,14 +13,6 @@
         /* El overlay del sidebar debe estar por encima de dropdowns */
         .fi-sidebar-close-overlay {
             z-index: 45 !important;
-        }
-
-        /* Los dropdowns de select deben tener z-index menor al sidebar */
-        .fi-fo-select .choices__list--dropdown,
-        .fi-fo-select .fi-select-dropdown,
-        [data-headlessui-state],
-        .fi-dropdown-panel {
-            z-index: 40 !important;
         }
 
         /* El contenido principal debe estar por debajo del sidebar */
@@ -37,6 +29,35 @@
             .fi-sidebar-close-overlay {
                 z-index: 55 !important;
             }
+        }
+
+        /* ===== ARREGLOS PARA DATEPICKERS Y SELECTS ===== */
+
+        /* Los datepickers deben tener z-index alto para estar sobre otros campos */
+        .fi-fo-date-time-picker .fi-dropdown-panel,
+        .flatpickr-calendar {
+            z-index: 100 !important;
+        }
+
+        /* Los selects deben tener un z-index menor que los datepickers */
+        .fi-fo-select .choices__list--dropdown,
+        .fi-fo-select [data-headlessui-state],
+        .fi-dropdown-panel:not(.fi-fo-date-time-picker .fi-dropdown-panel) {
+            z-index: 90 !important;
+        }
+
+        /* Asegurar que los campos del formulario no se superpongan incorrectamente */
+        .fi-fo-field-wrp {
+            position: relative;
+        }
+
+        /* Asegurar que la sección de filtros permita overflow visible */
+        .fi-section-content {
+            overflow: visible !important;
+        }
+
+        .fi-section {
+            overflow: visible !important;
         }
     </style>
 
