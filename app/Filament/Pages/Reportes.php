@@ -74,14 +74,16 @@ class Reportes extends Page implements HasForms, HasTable
                                     ->required()
                                     ->default(now()->startOfMonth())
                                     ->native(false)
-                                    ->live(onBlur: true),
+                                    ->closeOnDateSelection()
+                                    ->live(debounce: 500),
 
                                 Forms\Components\DatePicker::make('end_date')
                                     ->label('Fecha Fin')
                                     ->required()
                                     ->default(now())
                                     ->native(false)
-                                    ->live(onBlur: true),
+                                    ->closeOnDateSelection()
+                                    ->live(debounce: 500),
                             ]),
 
                         // Filtros principales - 4 columnas en desktop, 2 en tablet, 1 en móvil
@@ -99,7 +101,7 @@ class Reportes extends Page implements HasForms, HasTable
                                         'server' => 'Servidor',
                                     ])
                                     ->default('all')
-                                    ->live(),
+                                    ->live(debounce: 300),
 
                                 Forms\Components\Select::make('product_type')
                                     ->label('Tipo de Producto')
@@ -110,7 +112,7 @@ class Reportes extends Page implements HasForms, HasTable
                                         'server_credit' => 'Créditos',
                                     ])
                                     ->default('all')
-                                    ->live(),
+                                    ->live(debounce: 300),
 
                                 Forms\Components\Select::make('payment_method_id')
                                     ->label('Método de Pago')
@@ -119,7 +121,7 @@ class Reportes extends Page implements HasForms, HasTable
                                         return ['all' => 'Todos los métodos'] + $methods;
                                     })
                                     ->default('all')
-                                    ->live(),
+                                    ->live(debounce: 300),
 
                             ]),
 
@@ -147,9 +149,8 @@ class Reportes extends Page implements HasForms, HasTable
                                 $value === 'all' ? 'Todos los clientes' : \App\Models\Client::find($value)?->name
                             )
                             ->placeholder('Buscar cliente por nombre, email o teléfono...')
-                            ->preload()
                             ->allowHtml()
-                            ->live()
+                            ->live(debounce: 300)
                             ->nullable()
                             ->default(null)
                             ->helperText('Escribe para buscar entre 6,000+ clientes'),
