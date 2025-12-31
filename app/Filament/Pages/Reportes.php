@@ -10,6 +10,8 @@ use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Pages\Page;
 use Filament\Tables;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -40,16 +42,19 @@ class Reportes extends Page implements HasForms, HasTable
         'currency' => 'USD',
         'source' => 'all',
         'payment_method_id' => 'all',
-        'client_id' => null,
+        'client_id' => 'all',
+        'client_search' => '',
         'product_type' => 'all',
         'supplier_id' => 'all',
     ];
 
     public string $activeTab = 'USD';
 
+    // Propiedad para almacenar resultados de búsqueda de clientes
+    public array $clientSearchResults = [];
+
     public function mount(): void
     {
-        // SIEMPRE usar USD como default
         $this->activeTab = 'USD';
         $this->filters['currency'] = 'USD';
         $this->filters['start_date'] = now()->startOfMonth();
@@ -61,6 +66,26 @@ class Reportes extends Page implements HasForms, HasTable
         $this->filters['currency'] = $value;
     }
 
+    // Método que se ejecuta cuando cambia client_search
+    public function searchClients(): void
+    {
+        $search = $this->filters['client_search'] ?? '';
+
+        if (strlen($search) < 3) {
+            $this->clientSearchResults = [];
+            return;
+        }
+
+        $this->clientSearchResults = \App\Models\Client::query()
+            ->where('name', 'like', "%{$search}%")
+            ->orWhere('email', 'like', "%{$search}%")
+            ->orWhere('phone', 'like', "%{$search}%")
+            ->orderBy('name')
+            ->limit(50)
+            ->pluck('name', 'id')
+            ->toArray();
+    }
+
     public function form(Form $form): Form
     {
         return $form
@@ -68,11 +93,8 @@ class Reportes extends Page implements HasForms, HasTable
                 Forms\Components\Section::make('Filtros de Reporte')
                     ->description('Filtra las ventas según los criterios seleccionados.')
                     ->schema([
-                        // Grid responsive: 1 col móvil, 2 tablet
-                        Forms\Components\Grid::make([
-                            'default' => 1,
-                            'sm' => 2,
-                        ])
+                        // Fechas - 2 columnas
+                        Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\DatePicker::make('start_date')
                                     ->label('Fecha Inicio')
@@ -89,10 +111,11 @@ class Reportes extends Page implements HasForms, HasTable
                                     ->live(onBlur: true),
                             ]),
 
-                        // Fila 1: Origen y Tipo (2 columnas)
+                        // Filtros principales - 4 columnas en desktop, 2 en tablet, 1 en móvil
                         Forms\Components\Grid::make([
                             'default' => 1,
                             'sm' => 2,
+                            'lg' => 4,
                         ])
                             ->schema([
                                 Forms\Components\Select::make('source')
@@ -103,7 +126,6 @@ class Reportes extends Page implements HasForms, HasTable
                                         'server' => 'Servidor',
                                     ])
                                     ->default('all')
-                                    ->native(false)
                                     ->live(),
 
                                 Forms\Components\Select::make('product_type')
@@ -115,68 +137,79 @@ class Reportes extends Page implements HasForms, HasTable
                                         'server_credit' => 'Créditos',
                                     ])
                                     ->default('all')
-                                    ->native(false)
                                     ->live(),
-                            ]),
 
-                        // Fila 2: Método de Pago y Proveedor (2 columnas)
-                        Forms\Components\Grid::make([
-                            'default' => 1,
-                            'sm' => 2,
-                        ])
-                            ->schema([
                                 Forms\Components\Select::make('payment_method_id')
                                     ->label('Método de Pago')
                                     ->options(function () {
                                         $methods = \App\Models\PaymentMethod::pluck('name', 'id')->toArray();
-
                                         return ['all' => 'Todos los métodos'] + $methods;
                                     })
                                     ->default('all')
-                                    ->native(false)
                                     ->live(),
 
                                 Forms\Components\Select::make('supplier_id')
                                     ->label('Proveedor')
                                     ->options(function () {
                                         $suppliers = \App\Models\Supplier::pluck('name', 'id')->toArray();
-
                                         return ['all' => 'Todos los proveedores'] + $suppliers;
                                     })
                                     ->default('all')
-                                    ->native(false)
                                     ->live(),
                             ]),
 
-                        // Fila 3: Búsqueda de Cliente (ancho completo)
-                        Forms\Components\Select::make('client_id')
-                            ->label('Buscar Cliente')
-                            ->placeholder('Escriba para buscar...')
-                            ->native(false)
-                            ->searchable()
-                            ->searchDebounce(300)
-                            ->searchPrompt('Escriba al menos 2 caracteres...')
-                            ->noSearchResultsMessage('No se encontraron clientes')
-                            ->getSearchResultsUsing(function (string $search): array {
-                                if (strlen($search) < 2) {
-                                    return [];
-                                }
+                        // Búsqueda de cliente - TextInput + Select reactivo
+                        Forms\Components\Grid::make([
+                            'default' => 1,
+                            'sm' => 2,
+                        ])
+                            ->schema([
+                                Forms\Components\TextInput::make('client_search')
+                                    ->label('Buscar Cliente')
+                                    ->placeholder('Escribe el nombre del cliente...')
+                                    ->live(debounce: 500)
+                                    ->afterStateUpdated(function (Get $get, Set $set, ?string $state) {
+                                        // Buscar clientes cuando hay 3+ caracteres
+                                        if (empty($state) || strlen($state) < 3) {
+                                            $set('client_id', 'all');
+                                            $this->clientSearchResults = [];
+                                        } else {
+                                            $this->clientSearchResults = \App\Models\Client::query()
+                                                ->where('name', 'like', "%{$state}%")
+                                                ->orWhere('email', 'like', "%{$state}%")
+                                                ->orWhere('phone', 'like', "%{$state}%")
+                                                ->orderBy('name')
+                                                ->limit(50)
+                                                ->pluck('name', 'id')
+                                                ->toArray();
+                                        }
+                                    })
+                                    ->helperText('Escribe al menos 3 letras para buscar'),
 
-                                return \App\Models\Client::query()
-                                    ->where('name', 'like', "%{$search}%")
-                                    ->orWhere('email', 'like', "%{$search}%")
-                                    ->orWhere('phone', 'like', "%{$search}%")
-                                    ->orderBy('name')
-                                    ->limit(50)
-                                    ->pluck('name', 'id')
-                                    ->toArray();
-                            })
-                            ->getOptionLabelUsing(fn ($value): ?string =>
-                                \App\Models\Client::find($value)?->name
-                            )
-                            ->live()
-                            ->helperText('Busca por nombre, email o teléfono')
-                            ->columnSpanFull(),
+                                Forms\Components\Select::make('client_id')
+                                    ->label('Seleccionar Cliente')
+                                    ->options(function (Get $get) {
+                                        $search = $get('client_search');
+
+                                        if (empty($search) || strlen($search) < 3) {
+                                            return ['all' => 'Todos los clientes'];
+                                        }
+
+                                        $clients = \App\Models\Client::query()
+                                            ->where('name', 'like', "%{$search}%")
+                                            ->orWhere('email', 'like', "%{$search}%")
+                                            ->orWhere('phone', 'like', "%{$search}%")
+                                            ->orderBy('name')
+                                            ->limit(50)
+                                            ->pluck('name', 'id')
+                                            ->toArray();
+
+                                        return ['all' => 'Todos los clientes'] + $clients;
+                                    })
+                                    ->default('all')
+                                    ->live()
+                                    ->helperText('Selecciona un cliente de los resultados'),
+                            ]),
                     ])
                     ->collapsed(false)
                     ->collapsible(),
@@ -216,8 +249,7 @@ class Reportes extends Page implements HasForms, HasTable
                 if (! empty($data['payment_method_id']) && $data['payment_method_id'] !== 'all') {
                     $query->where('payment_method_id', $data['payment_method_id']);
                 }
-                // Filtro por cliente - ahora usa null en vez de 'all'
-                if (! empty($data['client_id'])) {
+                if (! empty($data['client_id']) && $data['client_id'] !== 'all') {
                     $query->where('client_id', $data['client_id']);
                 }
                 if (! empty($data['supplier_id']) && $data['supplier_id'] !== 'all') {
@@ -284,8 +316,7 @@ class Reportes extends Page implements HasForms, HasTable
                     ->label('Costo')
                     ->money(fn () => $this->activeTab)
                     ->color('warning')
-                    ->getStateUsing(fn ($record) => $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity)
-                    )
+                    ->getStateUsing(fn ($record) => $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity))
                     ->summarize(Tables\Columns\Summarizers\Summarizer::make()
                         ->label('TOTAL COSTOS')
                         ->money(fn () => $this->activeTab)
@@ -299,7 +330,6 @@ class Reportes extends Page implements HasForms, HasTable
                     ->getStateUsing(function ($record) {
                         $total = $record->total_amount;
                         $cost = $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity);
-
                         return $total - $cost;
                     })
                     ->summarize(Tables\Columns\Summarizers\Summarizer::make()
@@ -349,11 +379,10 @@ class Reportes extends Page implements HasForms, HasTable
             ->when(! empty($this->filters['start_date']), fn ($q) => $q->whereDate('sale_date', '>=', $this->filters['start_date']))
             ->when(! empty($this->filters['end_date']), fn ($q) => $q->whereDate('sale_date', '<=', $this->filters['end_date']))
             ->when(! empty($this->filters['source']) && $this->filters['source'] !== 'all', fn ($q) => $q->where('source', $this->filters['source']))
-            ->when(! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all', fn ($q) => $q->whereHas('items.product', fn ($sq) => $sq->where('type', $this->filters['product_type']))
-            )
+            ->when(! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all', fn ($q) => $q->whereHas('items.product', fn ($sq) => $sq->where('type', $this->filters['product_type'])))
             ->when(! empty($this->filters['payment_method_id']) && $this->filters['payment_method_id'] !== 'all', fn ($q) => $q->where('payment_method_id', $this->filters['payment_method_id']))
             ->when(! empty($this->filters['supplier_id']) && $this->filters['supplier_id'] !== 'all', fn ($q) => $q->where('supplier_id', $this->filters['supplier_id']))
-            ->when(! empty($this->filters['client_id']), fn ($q) => $q->where('client_id', $this->filters['client_id']))
+            ->when(! empty($this->filters['client_id']) && $this->filters['client_id'] !== 'all', fn ($q) => $q->where('client_id', $this->filters['client_id']))
             ->where('status', 'completed')
             ->whereNull('refunded_at')
             ->with('items')
@@ -368,11 +397,10 @@ class Reportes extends Page implements HasForms, HasTable
             ->when(! empty($this->filters['start_date']), fn ($q) => $q->whereDate('sale_date', '>=', $this->filters['start_date']))
             ->when(! empty($this->filters['end_date']), fn ($q) => $q->whereDate('sale_date', '<=', $this->filters['end_date']))
             ->when(! empty($this->filters['source']) && $this->filters['source'] !== 'all', fn ($q) => $q->where('source', $this->filters['source']))
-            ->when(! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all', fn ($q) => $q->whereHas('items.product', fn ($sq) => $sq->where('type', $this->filters['product_type']))
-            )
+            ->when(! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all', fn ($q) => $q->whereHas('items.product', fn ($sq) => $sq->where('type', $this->filters['product_type'])))
             ->when(! empty($this->filters['payment_method_id']) && $this->filters['payment_method_id'] !== 'all', fn ($q) => $q->where('payment_method_id', $this->filters['payment_method_id']))
             ->when(! empty($this->filters['supplier_id']) && $this->filters['supplier_id'] !== 'all', fn ($q) => $q->where('supplier_id', $this->filters['supplier_id']))
-            ->when(! empty($this->filters['client_id']), fn ($q) => $q->where('client_id', $this->filters['client_id']))
+            ->when(! empty($this->filters['client_id']) && $this->filters['client_id'] !== 'all', fn ($q) => $q->where('client_id', $this->filters['client_id']))
             ->where('status', 'completed')
             ->whereNull('refunded_at')
             ->with('items')
@@ -381,7 +409,6 @@ class Reportes extends Page implements HasForms, HasTable
         return $sales->sum(function ($sale) {
             $total = $sale->total_amount;
             $cost = $sale->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity);
-
             return $total - $cost;
         });
     }
@@ -407,7 +434,7 @@ class Reportes extends Page implements HasForms, HasTable
         if (! empty($this->filters['supplier_id']) && $this->filters['supplier_id'] !== 'all') {
             $query->where('supplier_id', $this->filters['supplier_id']);
         }
-        if (! empty($this->filters['client_id'])) {
+        if (! empty($this->filters['client_id']) && $this->filters['client_id'] !== 'all') {
             $query->where('client_id', $this->filters['client_id']);
         }
         if (! empty($this->filters['product_type']) && $this->filters['product_type'] !== 'all') {
@@ -432,7 +459,6 @@ class Reportes extends Page implements HasForms, HasTable
             ->pluck('name', 'code')
             ->toArray();
 
-        // Ordenar: USD primero, NIO segundo, resto alfabético
         $ordered = [];
 
         if (isset($currencies['USD'])) {
@@ -445,7 +471,6 @@ class Reportes extends Page implements HasForms, HasTable
             unset($currencies['NIO']);
         }
 
-        // Agregar el resto ordenado alfabéticamente
         ksort($currencies);
 
         return array_merge($ordered, $currencies);
