@@ -89,11 +89,10 @@ class Reportes extends Page implements HasForms, HasTable
                                     ->live(onBlur: true),
                             ]),
 
-                        // Grid responsive: 1 col móvil, 2 tablet, 4 desktop
+                        // Fila 1: Origen y Tipo (2 columnas)
                         Forms\Components\Grid::make([
                             'default' => 1,
                             'sm' => 2,
-                            'lg' => 4,
                         ])
                             ->schema([
                                 Forms\Components\Select::make('source')
@@ -104,6 +103,7 @@ class Reportes extends Page implements HasForms, HasTable
                                         'server' => 'Servidor',
                                     ])
                                     ->default('all')
+                                    ->native(false)
                                     ->live(),
 
                                 Forms\Components\Select::make('product_type')
@@ -115,8 +115,16 @@ class Reportes extends Page implements HasForms, HasTable
                                         'server_credit' => 'Créditos',
                                     ])
                                     ->default('all')
+                                    ->native(false)
                                     ->live(),
+                            ]),
 
+                        // Fila 2: Método de Pago y Proveedor (2 columnas)
+                        Forms\Components\Grid::make([
+                            'default' => 1,
+                            'sm' => 2,
+                        ])
+                            ->schema([
                                 Forms\Components\Select::make('payment_method_id')
                                     ->label('Método de Pago')
                                     ->options(function () {
@@ -125,6 +133,7 @@ class Reportes extends Page implements HasForms, HasTable
                                         return ['all' => 'Todos los métodos'] + $methods;
                                     })
                                     ->default('all')
+                                    ->native(false)
                                     ->live(),
 
                                 Forms\Components\Select::make('supplier_id')
@@ -135,42 +144,39 @@ class Reportes extends Page implements HasForms, HasTable
                                         return ['all' => 'Todos los proveedores'] + $suppliers;
                                     })
                                     ->default('all')
+                                    ->native(false)
                                     ->live(),
                             ]),
 
-                        // Búsqueda asíncrona de clientes (6,000+ registros)
-                        Forms\Components\Grid::make([
-                            'default' => 1,
-                            'sm' => 2,
-                        ])
-                            ->schema([
-                                Forms\Components\Select::make('client_id')
-                                    ->label('Buscar Cliente')
-                                    ->placeholder('Escriba para buscar...')
-                                    ->searchable()
-                                    ->searchDebounce(300)
-                                    ->searchPrompt('Escriba al menos 2 caracteres...')
-                                    ->noSearchResultsMessage('No se encontraron clientes')
-                                    ->getSearchResultsUsing(function (string $search): array {
-                                        if (strlen($search) < 2) {
-                                            return [];
-                                        }
+                        // Fila 3: Búsqueda de Cliente (ancho completo)
+                        Forms\Components\Select::make('client_id')
+                            ->label('Buscar Cliente')
+                            ->placeholder('Escriba para buscar...')
+                            ->native(false)
+                            ->searchable()
+                            ->searchDebounce(300)
+                            ->searchPrompt('Escriba al menos 2 caracteres...')
+                            ->noSearchResultsMessage('No se encontraron clientes')
+                            ->getSearchResultsUsing(function (string $search): array {
+                                if (strlen($search) < 2) {
+                                    return [];
+                                }
 
-                                        return \App\Models\Client::query()
-                                            ->where('name', 'like', "%{$search}%")
-                                            ->orWhere('email', 'like', "%{$search}%")
-                                            ->orWhere('phone', 'like', "%{$search}%")
-                                            ->orderBy('name')
-                                            ->limit(50)
-                                            ->pluck('name', 'id')
-                                            ->toArray();
-                                    })
-                                    ->getOptionLabelUsing(fn ($value): ?string =>
-                                        \App\Models\Client::find($value)?->name
-                                    )
-                                    ->live()
-                                    ->helperText('Busca por nombre, email o teléfono'),
-                            ]),
+                                return \App\Models\Client::query()
+                                    ->where('name', 'like', "%{$search}%")
+                                    ->orWhere('email', 'like', "%{$search}%")
+                                    ->orWhere('phone', 'like', "%{$search}%")
+                                    ->orderBy('name')
+                                    ->limit(50)
+                                    ->pluck('name', 'id')
+                                    ->toArray();
+                            })
+                            ->getOptionLabelUsing(fn ($value): ?string =>
+                                \App\Models\Client::find($value)?->name
+                            )
+                            ->live()
+                            ->helperText('Busca por nombre, email o teléfono')
+                            ->columnSpanFull(),
                     ])
                     ->collapsed(false)
                     ->collapsible(),
