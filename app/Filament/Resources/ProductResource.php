@@ -4,8 +4,11 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
+use App\Models\Supplier;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -40,6 +43,9 @@ class ProductResource extends Resource
 
     public static function form(Form $form): Form
     {
+        // Obtener proveedores del sistema
+        $suppliers = Supplier::all();
+
         return $form
             ->schema([
                 Forms\Components\Section::make('Detalles del Producto / Servicio')
@@ -52,20 +58,8 @@ class ProductResource extends Resource
                             ->placeholder('Ejemplo: VPS Cloud 2GB RAM')
                             ->columnSpanFull(),
 
-                        Forms\Components\Grid::make(3)
+                        Forms\Components\Grid::make(2)
                             ->schema([
-                                Forms\Components\TextInput::make('price')
-                                    ->label('Precio Venta')
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->required()
-                                    ->minValue(0.01)
-                                    ->step(0.01)
-                                    ->placeholder('0.00')
-                                    ->validationMessages([
-                                        'min' => 'El precio debe ser mayor a 0.',
-                                    ]),
-
                                 Forms\Components\Select::make('type')
                                     ->label('Tipo')
                                     ->options([
@@ -83,12 +77,81 @@ class ProductResource extends Resource
                                     ->maxLength(255)
                                     ->alphaDash(),
                             ]),
-                            
+
                         Forms\Components\Toggle::make('is_active')
                             ->label('Disponible para venta (Stock / Activo)')
                             ->default(true)
                             ->inline(false),
                     ])->columns(1),
+
+                // SECCIÓN: Precios Base por Proveedor
+                Forms\Components\Section::make('Precios Base por Proveedor')
+                    ->description('Define el precio de costo para cada proveedor configurado')
+                    ->schema(
+                        $suppliers->count() > 0
+                            ? $suppliers->map(function ($supplier) {
+                                return Forms\Components\TextInput::make("base_prices.{$supplier->id}")
+                                    ->label($supplier->name)
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->step(0.01)
+                                    ->placeholder('0.00')
+                                    ->helperText($supplier->website ? "({$supplier->website})" : null);
+                            })->toArray()
+                            : [
+                                Forms\Components\Placeholder::make('no_suppliers')
+                                    ->label('')
+                                    ->content('No hay proveedores configurados. Agrega proveedores en el módulo de Proveedores.')
+                            ]
+                    )
+                    ->columns(2)
+                    ->collapsible(),
+
+                // SECCIÓN: Precios de Venta por Paquete
+                Forms\Components\Section::make('Precios de Venta por Paquete')
+                    ->description('Define los 4 precios de venta según el paquete del cliente')
+                    ->schema([
+                        Forms\Components\Grid::make(4)
+                            ->schema([
+                                Forms\Components\TextInput::make('price_pack_1')
+                                    ->label('Paquete 1 (Básico)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->step(0.01)
+                                    ->placeholder('0.00'),
+
+                                Forms\Components\TextInput::make('price_pack_2')
+                                    ->label('Paquete 2 (Estándar)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->step(0.01)
+                                    ->placeholder('0.00'),
+
+                                Forms\Components\TextInput::make('price_pack_3')
+                                    ->label('Paquete 3 (Premium)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->step(0.01)
+                                    ->placeholder('0.00'),
+
+                                Forms\Components\TextInput::make('price_pack_4')
+                                    ->label('Paquete 4 (Mayorista)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->step(0.01)
+                                    ->placeholder('0.00'),
+                            ]),
+
+                        // Precio principal (legacy/referencia)
+                        Forms\Components\TextInput::make('price')
+                            ->label('Precio General (Referencia)')
+                            ->numeric()
+                            ->prefix('$')
+                            ->step(0.01)
+                            ->placeholder('0.00')
+                            ->helperText('Precio por defecto si no aplica ningún paquete'),
+                    ])
+                    ->collapsible(),
             ]);
     }
 

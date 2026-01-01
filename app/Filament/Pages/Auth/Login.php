@@ -15,7 +15,7 @@ class Login extends BaseLogin
 
     public function getSubHeading(): string
     {
-        return '⚠️ SISTEMA PRIVADO - Acceso Restringido';
+        return '© ' . date('Y') . ' NicaGSM - Todos los derechos reservados';
     }
 
     protected function getForms(): array

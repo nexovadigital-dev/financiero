@@ -28,15 +28,20 @@
             }
         }
 
-        /* ===== DATEPICKERS - FONDO SÓLIDO Y Z-INDEX ===== */
+        /* ===== DATEPICKERS - SIEMPRE HACIA ARRIBA ===== */
 
-        /* Panel del DatePicker con fondo sólido */
+        /* Forzar que el calendario siempre se abra hacia arriba */
         .fi-fo-date-time-picker .fi-dropdown-panel {
             z-index: 100 !important;
             background-color: white !important;
             border-radius: 0.75rem !important;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+            box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.15), 0 -8px 10px -6px rgba(0, 0, 0, 0.1) !important;
             border: 1px solid #e5e7eb !important;
+            /* Posicionar hacia arriba */
+            bottom: 100% !important;
+            top: auto !important;
+            margin-bottom: 0.5rem !important;
+            margin-top: 0 !important;
         }
 
         /* Dark mode para DatePicker */
@@ -45,28 +50,17 @@
             border-color: #374151 !important;
         }
 
-        /* Asegurar que el contenido interno del calendario también tenga fondo */
-        .fi-fo-date-time-picker .fi-dropdown-panel > * {
-            background-color: inherit !important;
+        /* Asegurar fondo sólido en todos los elementos internos */
+        .fi-fo-date-time-picker .fi-dropdown-panel * {
+            background-color: inherit;
         }
 
-        /* Header del calendario (mes/año) */
-        .fi-fo-date-time-picker .fi-dropdown-panel [class*="header"],
-        .fi-fo-date-time-picker .fi-dropdown-panel .flex.items-center.justify-between {
+        .fi-fo-date-time-picker .fi-dropdown-panel > div {
             background-color: white !important;
+            border-radius: 0.75rem !important;
         }
 
-        .dark .fi-fo-date-time-picker .fi-dropdown-panel [class*="header"],
-        .dark .fi-fo-date-time-picker .fi-dropdown-panel .flex.items-center.justify-between {
-            background-color: #1f2937 !important;
-        }
-
-        /* Grid de días del calendario */
-        .fi-fo-date-time-picker .fi-dropdown-panel .grid {
-            background-color: white !important;
-        }
-
-        .dark .fi-fo-date-time-picker .fi-dropdown-panel .grid {
+        .dark .fi-fo-date-time-picker .fi-dropdown-panel > div {
             background-color: #1f2937 !important;
         }
 

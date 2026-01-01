@@ -57,8 +57,6 @@ class AdminPanelProvider extends PanelProvider
             ])
             // BRANDING
             ->brandName('NicaGSM Admin')
-            ->brandLogo(asset('images/logo.png'))
-            ->brandLogoHeight('3rem')
             ->favicon(asset('images/favicon.png'))
             
             // UI / UX
