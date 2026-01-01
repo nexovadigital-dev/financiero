@@ -25,10 +25,56 @@ class AdminPanelProvider extends PanelProvider
 {
     public function boot(): void
     {
-        // CSS Personalizado
+        // CSS Personalizado desde archivo
         FilamentView::registerRenderHook(
             PanelsRenderHook::HEAD_END,
             fn (): string => Blade::render('<link rel="stylesheet" href="{{ asset(\'css/filament-custom.css\') }}">')
+        );
+
+        // CSS Inline para fix de z-index y dropdowns
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::HEAD_END,
+            fn (): string => '<style>
+                /* DROPDOWNS GLOBALES - Menú usuario, filtros, acciones */
+                [x-data*="dropdown"],
+                [x-data*="Dropdown"],
+                .fi-dropdown-panel,
+                .fi-user-menu-panel,
+                [role="menu"] {
+                    z-index: 999999 !important;
+                    position: fixed !important;
+                }
+
+                /* Dropdowns de tabla - filtros y bulk actions */
+                .fi-ta .fi-dropdown-panel,
+                .fi-ta [role="menu"],
+                .fi-ta-actions [x-data] > div[style*="position"],
+                [x-data*="tableColumnSearchIndicator"],
+                [x-data*="tableFiltersIndicator"] {
+                    z-index: 999999 !important;
+                    position: fixed !important;
+                }
+
+                /* Z-index para dropdowns en formularios */
+                .fi-form .fi-dropdown-panel,
+                .fi-form [role="menu"],
+                .fi-form [role="listbox"] {
+                    z-index: 9999 !important;
+                }
+
+                /* Modales SIEMPRE por encima de todo */
+                .fi-modal,
+                [role="dialog"],
+                .fi-modal-window {
+                    z-index: 99999 !important;
+                }
+
+                /* Contenido de modal scrollable */
+                .fi-modal-content {
+                    z-index: 99999 !important;
+                    overflow-y: auto;
+                }
+            </style>'
         );
 
         // Meta tags para prevenir indexación en buscadores
@@ -57,11 +103,13 @@ class AdminPanelProvider extends PanelProvider
             ])
             // BRANDING
             ->brandName('NicaGSM Admin')
-            ->favicon(asset('images/favicon.png'))
+            ->favicon(asset('images/logo.png')) // Usar mismo logo para favicon
             
             // UI / UX
             ->spa()
             ->font('Poppins')
+            ->darkMode(true) // Habilitar toggle de modo oscuro en menú de usuario
+            ->globalSearch(false) // Deshabilitar búsqueda global
 
             // MENÚ LATERAL FIJO (Sin opción de colapsar)
             ->sidebarFullyCollapsibleOnDesktop(false)
@@ -72,6 +120,16 @@ class AdminPanelProvider extends PanelProvider
 
             // PERFIL DE USUARIO - Habilitar edición de perfil
             ->profile(\App\Filament\Pages\Auth\EditProfile::class)
+            ->userMenuItems([
+                'profile' => \Filament\Navigation\MenuItem::make()
+                    ->label('Mi Perfil')
+                    ->icon('heroicon-o-user-circle'),
+                'theme' => \Filament\Navigation\MenuItem::make()
+                    ->label('Cambiar Tema')
+                    ->icon('heroicon-o-moon')
+                    ->url(fn () => '#')
+                    ->hidden(),
+            ])
 
             // COMPONENTES
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')

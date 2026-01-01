@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes; // Importar SoftDeletes
 
 class Product extends Model
@@ -13,11 +15,11 @@ class Product extends Model
     protected $fillable = [
         'name',
         'price',
-        'base_prices',
-        'price_pack_1',
-        'price_pack_2',
-        'price_pack_3',
-        'price_pack_4',
+        'base_price',
+        'price_package_1',
+        'price_package_2',
+        'price_package_3',
+        'price_package_4',
         'type',
         'required_metadata',
         'woocommerce_product_id',
@@ -27,27 +29,86 @@ class Product extends Model
 
     protected $casts = [
         'required_metadata' => 'array',
-        'base_prices' => 'array',
         'price' => 'decimal:2',
-        'price_pack_1' => 'decimal:2',
-        'price_pack_2' => 'decimal:2',
-        'price_pack_3' => 'decimal:2',
-        'price_pack_4' => 'decimal:2',
+        'base_price' => 'decimal:2',
+        'price_package_1' => 'decimal:2',
+        'price_package_2' => 'decimal:2',
+        'price_package_3' => 'decimal:2',
+        'price_package_4' => 'decimal:2',
         'is_active' => 'boolean',
     ];
 
-    // Obtener precio base de un proveedor específico
-    public function getBasePriceForSupplier($supplierId): ?float
+    /**
+     * Obtener el precio según el paquete seleccionado
+     */
+    public function getPriceForPackage(int $packageId): float
     {
-        if (!$this->base_prices || !isset($this->base_prices[$supplierId])) {
-            return null;
-        }
-        return (float) $this->base_prices[$supplierId];
+        return match($packageId) {
+            1 => $this->price_package_1,
+            2 => $this->price_package_2,
+            3 => $this->price_package_3,
+            4 => $this->price_package_4,
+            default => 0,
+        };
     }
 
-    // Relación con proveedores
-    public function suppliers()
+    /**
+     * Verificar si el producto tiene precios configurados
+     */
+    public function hasPricesConfigured(): bool
     {
-        return Supplier::whereIn('id', array_keys($this->base_prices ?? []))->get();
+        return $this->base_price > 0
+            || $this->price_package_1 > 0
+            || $this->price_package_2 > 0
+            || $this->price_package_3 > 0
+            || $this->price_package_4 > 0;
+    }
+
+    /**
+     * Relación con precios por proveedor
+     */
+    public function supplierPrices(): HasMany
+    {
+        return $this->hasMany(ProductSupplierPrice::class);
+    }
+
+    /**
+     * Relación many-to-many con proveedores a través de precios
+     */
+    public function suppliers(): BelongsToMany
+    {
+        return $this->belongsToMany(Supplier::class, 'product_supplier_prices')
+            ->withPivot('base_price')
+            ->withTimestamps();
+    }
+
+    /**
+     * Obtener el precio base para un proveedor específico
+     */
+    public function getBasePriceForSupplier(?int $supplierId): float
+    {
+        if (!$supplierId) {
+            // Si no hay proveedor, usar el precio base antiguo como fallback
+            return $this->base_price ?? 0;
+        }
+
+        $supplierPrice = $this->supplierPrices()
+            ->where('supplier_id', $supplierId)
+            ->first();
+
+        return $supplierPrice?->base_price ?? $this->base_price ?? 0;
+    }
+
+    /**
+     * Obtener precio final para cliente según proveedor y paquete
+     */
+    public function getFinalPrice(?int $supplierId, int $packageId): float
+    {
+        $basePrice = $this->getBasePriceForSupplier($supplierId);
+        $packageMultiplier = $this->getPriceForPackage($packageId);
+
+        // Si el paquete tiene precio configurado, usarlo
+        // Si no, usar el precio base del proveedor
+        return $packageMultiplier > 0 ? $packageMultiplier : $basePrice;
     }
 }

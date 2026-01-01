@@ -4,11 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
-use App\Models\Supplier;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Forms\Get;
-use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -34,7 +31,7 @@ class ProductResource extends Resource
 
     public static function getGlobalSearchResultDetails($record): array
     {
-        $details = ['Precio' => '$' . number_format($record->price, 2)];
+        $details = ['Precio Base' => '$' . number_format($record->base_price ?? 0, 2)];
         if ($record->sku) {
             $details['SKU'] = $record->sku;
         }
@@ -43,9 +40,6 @@ class ProductResource extends Resource
 
     public static function form(Form $form): Form
     {
-        // Obtener proveedores del sistema
-        $suppliers = Supplier::all();
-
         return $form
             ->schema([
                 Forms\Components\Section::make('Detalles del Producto / Servicio')
@@ -77,81 +71,101 @@ class ProductResource extends Resource
                                     ->maxLength(255)
                                     ->alphaDash(),
                             ]),
-
+                            
                         Forms\Components\Toggle::make('is_active')
                             ->label('Disponible para venta (Stock / Activo)')
                             ->default(true)
                             ->inline(false),
                     ])->columns(1),
 
-                // SECCIÓN: Precios Base por Proveedor
-                Forms\Components\Section::make('Precios Base por Proveedor')
-                    ->description('Define el precio de costo para cada proveedor configurado')
-                    ->schema(
-                        $suppliers->count() > 0
-                            ? $suppliers->map(function ($supplier) {
-                                return Forms\Components\TextInput::make("base_prices.{$supplier->id}")
-                                    ->label($supplier->name)
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->step(0.01)
-                                    ->placeholder('0.00')
-                                    ->helperText($supplier->website ? "({$supplier->website})" : null);
-                            })->toArray()
-                            : [
-                                Forms\Components\Placeholder::make('no_suppliers')
-                                    ->label('')
-                                    ->content('No hay proveedores configurados. Agrega proveedores en el módulo de Proveedores.')
-                            ]
-                    )
-                    ->columns(2)
-                    ->collapsible(),
-
-                // SECCIÓN: Precios de Venta por Paquete
-                Forms\Components\Section::make('Precios de Venta por Paquete')
-                    ->description('Define los 4 precios de venta según el paquete del cliente')
+                Forms\Components\Section::make('💰 Precios Base por Proveedor')
+                    ->description('Configure el precio base (costo) para cada proveedor. Al vender, se usará el precio del proveedor seleccionado.')
                     ->schema([
-                        Forms\Components\Grid::make(4)
+                        Forms\Components\Repeater::make('supplierPrices')
+                            ->relationship()
+                            ->label('Precios por Proveedor')
                             ->schema([
-                                Forms\Components\TextInput::make('price_pack_1')
-                                    ->label('Paquete 1 (Básico)')
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->step(0.01)
-                                    ->placeholder('0.00'),
+                                Forms\Components\Grid::make(2)
+                                    ->schema([
+                                        Forms\Components\Select::make('supplier_id')
+                                            ->label('Proveedor')
+                                            ->relationship('supplier', 'name')
+                                            ->required()
+                                            ->distinct()
+                                            ->disableOptionsWhenSelectedInSiblingRepeaterItems()
+                                            ->searchable(),
 
-                                Forms\Components\TextInput::make('price_pack_2')
-                                    ->label('Paquete 2 (Estándar)')
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->step(0.01)
-                                    ->placeholder('0.00'),
+                                        Forms\Components\TextInput::make('base_price')
+                                            ->label('Precio Base (USD)')
+                                            ->numeric()
+                                            ->prefix('$')
+                                            ->default(0)
+                                            ->minValue(0)
+                                            ->step(0.01)
+                                            ->required()
+                                            ->helperText('Costo de este producto con este proveedor'),
+                                    ]),
+                            ])
+                            ->defaultItems(0)
+                            ->addActionLabel('+ Agregar Proveedor')
+                            ->collapsible()
+                            ->itemLabel(fn (array $state): ?string =>
+                                \App\Models\Supplier::find($state['supplier_id'])?->name . ' - $' . number_format($state['base_price'] ?? 0, 2)
+                            )
+                            ->columnSpanFull(),
 
-                                Forms\Components\TextInput::make('price_pack_3')
-                                    ->label('Paquete 3 (Premium)')
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->step(0.01)
-                                    ->placeholder('0.00'),
-
-                                Forms\Components\TextInput::make('price_pack_4')
-                                    ->label('Paquete 4 (Mayorista)')
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->step(0.01)
-                                    ->placeholder('0.00'),
-                            ]),
-
-                        // Precio principal (legacy/referencia)
-                        Forms\Components\TextInput::make('price')
-                            ->label('Precio General (Referencia)')
-                            ->numeric()
-                            ->prefix('$')
-                            ->step(0.01)
-                            ->placeholder('0.00')
-                            ->helperText('Precio por defecto si no aplica ningún paquete'),
+                        Forms\Components\Placeholder::make('supplier_prices_note')
+                            ->label('📝 Nota Importante')
+                            ->content('Al reportar una venta, deberá seleccionar el proveedor y el sistema usará automáticamente el precio base de ese proveedor. Los paquetes de cliente (abajo) se aplicarán sobre el precio del proveedor elegido.')
+                            ->columnSpanFull(),
                     ])
-                    ->collapsible(),
+                    ->collapsible()
+                    ->collapsed(false),
+
+                Forms\Components\Section::make('📦 Precios para Paquetes de Cliente')
+                    ->description('Configure los precios de venta para cada paquete de cliente. Estos precios se mostrarán automáticamente según el paquete del cliente.')
+                    ->schema([
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('price_package_1')
+                                    ->label('📦 Paquete 1 (Premium)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->default(0)
+                                    ->minValue(0)
+                                    ->step(0.01)
+                                    ->helperText('Precio para clientes Premium'),
+
+                                Forms\Components\TextInput::make('price_package_2')
+                                    ->label('📦 Paquete 2 (Mayorista)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->default(0)
+                                    ->minValue(0)
+                                    ->step(0.01)
+                                    ->helperText('Precio para Mayoristas'),
+
+                                Forms\Components\TextInput::make('price_package_3')
+                                    ->label('📦 Paquete 3 (Minorista)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->default(0)
+                                    ->minValue(0)
+                                    ->step(0.01)
+                                    ->helperText('Precio para Minoristas'),
+
+                                Forms\Components\TextInput::make('price_package_4')
+                                    ->label('📦 Paquete 4 (Especial)')
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->default(0)
+                                    ->minValue(0)
+                                    ->step(0.01)
+                                    ->helperText('Precio Especial'),
+                            ]),
+                    ])
+                    ->collapsible()
+                    ->collapsed(true),
             ]);
     }
 
@@ -163,13 +177,14 @@ class ProductResource extends Resource
                     ->label('Nombre')
                     ->searchable()
                     ->weight('bold')
-                    ->wrap(), // Permite que nombres largos de variantes bajen de línea
-                    
-                Tables\Columns\TextColumn::make('price')
-                    ->label('Precio')
+                    ->limit(50),
+
+                Tables\Columns\TextColumn::make('base_price')
+                    ->label('Precio Base')
                     ->money('USD')
-                    ->sortable(),
-                    
+                    ->sortable()
+                    ->default('0.00'),
+
                 Tables\Columns\TextColumn::make('type')
                     ->label('Tipo')
                     ->badge()
@@ -177,36 +192,48 @@ class ProductResource extends Resource
                         'service' => 'warning',
                         'server_credit' => 'info',
                         'digital_product' => 'success',
-                        'store' => 'primary',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'service' => 'Servicio Servidor',
-                        'server_credit' => 'Crédito Servidor',
-                        'digital_product' => 'Artículo Tienda',
-                        'store' => 'Tienda',
+                        'service' => 'Servicio',
+                        'server_credit' => 'Crédito',
+                        'digital_product' => 'Tienda',
                         default => $state,
-                    }),
+                    })
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('sku')
                     ->label('SKU')
                     ->searchable()
                     ->color('gray'),
-                    
+
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label('Disp.')
+                    ->label('Activo')
                     ->boolean(),
             ])
-            ->defaultSort('type', 'asc') // Ordenar por tipo: store primero, luego service, luego server_credit
+            // Mostrar solo productos NO eliminados (deleted_at IS NULL)
+            // La sincronización WooCommerce restaura productos con deleted_at = null
+            ->modifyQueryUsing(fn ($query) => $query
+                ->whereNull('deleted_at')
+                ->orderByRaw("
+                    CASE type
+                        WHEN 'digital_product' THEN 1
+                        WHEN 'service' THEN 2
+                        WHEN 'server_credit' THEN 3
+                        ELSE 4
+                    END, name ASC
+                ")
+            )
             ->filters([
                 Tables\Filters\SelectFilter::make('type')
-                    ->label('Tipo de Producto')
+                    ->label('Filtrar por Tipo')
                     ->options([
-                        'store' => '🏪 Tienda (WooCommerce)',
-                        'digital_product' => '📦 Artículo Digital',
+                        'digital_product' => '🏪 Artículo Tienda',
                         'service' => '🖥️ Servicio Servidor',
                         'server_credit' => '💳 Crédito Servidor',
-                    ]),
+                    ])
+                    ->native(false)
+                    ->placeholder('Todos los tipos'),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),

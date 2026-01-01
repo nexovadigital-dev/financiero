@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\SaleResource\Pages;
 use App\Models\Sale;
 use App\Models\Product;
+use App\Models\PricePackage;
 use App\Models\Currency;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -62,6 +63,42 @@ class SaleResource extends Resource
                                     ])
                                     ->required(),
 
+                                Forms\Components\Select::make('price_package_id')
+                                    ->label('📦 Paquete de Precios')
+                                    ->options(PricePackage::active()->ordered()->pluck('name', 'id'))
+                                    ->default(fn () => PricePackage::active()->ordered()->first()?->id)
+                                    ->required()
+                                    ->live()
+                                    ->helperText('Seleccione el paquete de precios para esta venta. Los productos usarán el precio de este paquete.')
+                                    ->columnSpanFull(),
+
+                                Forms\Components\Checkbox::make('without_supplier')
+                                    ->label('Sin Proveedor (venta como INGRESO)')
+                                    ->helperText('Si marca esta opción, la venta de créditos NO se debitará del proveedor.')
+                                    ->live()
+                                    ->afterStateUpdated(function (Set $set, $state) {
+                                        if ($state) {
+                                            $set('supplier_id', null); // Limpiar proveedor
+                                        }
+                                    })
+                                    ->visible(fn (Get $get) => self::isServerCreditsPayment($get('payment_method_id')))
+                                    ->columnSpanFull(),
+
+                                Forms\Components\Select::make('supplier_id')
+                                    ->label(fn (Get $get) => self::isServerCreditsPayment($get('payment_method_id'))
+                                        ? 'Proveedor (OBLIGATORIO para Créditos Servidor)'
+                                        : 'Proveedor (Referencia Interna)')
+                                    ->relationship('supplier', 'name')
+                                    ->searchable()
+                                    ->preload()
+                                    ->placeholder('Seleccionar proveedor')
+                                    ->helperText(fn (Get $get) => self::isServerCreditsPayment($get('payment_method_id'))
+                                        ? '⚠️ Debe seleccionar el proveedor del cual se debitará el crédito.'
+                                        : 'Vincular esta venta con un proveedor para contabilidad interna.')
+                                    ->required(fn (Get $get) => self::isServerCreditsPayment($get('payment_method_id')) && !$get('without_supplier'))
+                                    ->visible(fn (Get $get) => !$get('without_supplier'))
+                                    ->live(),
+
                                 Forms\Components\Select::make('source')
                                     ->label('Origen de Venta')
                                     ->options([
@@ -96,6 +133,18 @@ class SaleResource extends Resource
                                 Forms\Components\Select::make('payment_method_id')
                                     ->label('Método de Pago')
                                     ->relationship('paymentMethod', 'name')
+                                    ->live()
+                                    ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                                        // Cambiar moneda automáticamente según método de pago
+                                        if ($state) {
+                                            $paymentMethod = \App\Models\PaymentMethod::find($state);
+                                            if ($paymentMethod) {
+                                                $set('currency', $paymentMethod->currency);
+                                                // Aplicar conversión de moneda
+                                                self::convertCurrency($get, $set, $paymentMethod->currency);
+                                            }
+                                        }
+                                    })
                                     ->required(),
 
                                 Forms\Components\TextInput::make('payment_reference')
@@ -113,6 +162,9 @@ class SaleResource extends Resource
                                             });
                                     })
                                     ->default('USD')
+                                    ->disabled() // No editable - se define automáticamente por el método de pago
+                                    ->dehydrated() // Pero sí se guarda en BD
+                                    ->helperText('✓ Moneda del método de pago seleccionado')
                                     ->live()
                                     ->afterStateUpdated(function (Get $get, Set $set, $state) {
                                         self::convertCurrency($get, $set, $state);
@@ -182,6 +234,9 @@ class SaleResource extends Resource
                     ->schema([
                         Forms\Components\Repeater::make('items')
                             ->relationship()
+                            ->minItems(1)
+                            ->label('Productos de la Venta')
+                            ->helperText('⚠️ Debe agregar al menos un producto a la venta')
                             ->schema([
                                 Forms\Components\Grid::make(4)
                                     ->schema([
@@ -191,13 +246,40 @@ class SaleResource extends Resource
                                             ->searchable()
                                             ->reactive() // Escucha cambios
                                             ->afterStateUpdated(function ($state, Set $set, Get $get) {
-                                                // 1. Busca el precio del producto
+                                                // 1. Busca el producto
                                                 $product = Product::find($state);
                                                 if ($product) {
-                                                    $set('unit_price', $product->price);
-                                                    // 2. Calcula subtotal (Precio x Cantidad)
+                                                    // 2. Obtener el paquete de precios seleccionado
+                                                    $packageId = $get('../../price_package_id');
+
+                                                    // 3. Determinar el precio según el paquete
+                                                    $packagePrice = null;
+                                                    if ($packageId) {
+                                                        $packagePrice = $product->getPriceForPackage($packageId);
+
+                                                        // VALIDACIÓN CRÍTICA: Si el paquete está seleccionado pero el precio no está configurado
+                                                        if ($packagePrice <= 0) {
+                                                            \Filament\Notifications\Notification::make()
+                                                                ->warning()
+                                                                ->title('⚠️ Precio no configurado')
+                                                                ->body("El producto '{$product->name}' no tiene precio configurado para el paquete seleccionado. Usando precio base como referencia.")
+                                                                ->send();
+
+                                                            // Usar precio base del producto como fallback
+                                                            $packagePrice = $product->price > 0 ? $product->price : 0;
+                                                        }
+                                                    } else {
+                                                        $packagePrice = $product->price;
+                                                    }
+
+                                                    // 4. Guardar precios
+                                                    $set('base_price', $product->base_price ?? 0); // Precio que se debita del proveedor
+                                                    $set('package_price', $packagePrice); // Precio que se cobra al cliente
+                                                    $set('unit_price', $packagePrice); // Para compatibilidad
+
+                                                    // 5. Calcula subtotal (Precio del paquete x Cantidad)
                                                     $qty = $get('quantity') ?? 1;
-                                                    $set('total_price', $product->price * $qty);
+                                                    $set('total_price', $packagePrice * $qty);
                                                 }
                                             })
                                             ->columnSpan(2) // Ocupa más espacio
@@ -240,9 +322,13 @@ class SaleResource extends Resource
                                             })
                                             ->columnSpan(1),
                                             
-                                        // Campo oculto para guardar el subtotal de la línea
+                                        // Campos ocultos para guardar precios
                                         Forms\Components\Hidden::make('total_price')
-                                            ->dehydrated(), 
+                                            ->dehydrated(),
+                                        Forms\Components\Hidden::make('base_price')
+                                            ->dehydrated(),
+                                        Forms\Components\Hidden::make('package_price')
+                                            ->dehydrated(),
                                     ]),
                             ])
                             ->live() // IMPORTANTE: Escucha cambios en agregar/borrar items
@@ -312,20 +398,20 @@ class SaleResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('id')
-                    ->label('# Orden')
+                    ->label('#')
                     ->sortable()
                     ->weight('bold'),
-                
+
                 Tables\Columns\TextColumn::make('source')
                     ->label('Origen')
                     ->badge()
                     ->colors([
-                        'success' => 'store',   // Verde para tienda
-                        'warning' => 'server',  // Amarillo para servidor
+                        'success' => 'store',
+                        'warning' => 'server',
                     ])
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'store' => 'Tienda',
-                        'server' => 'Servidor',
+                        'store' => '🏪',
+                        'server' => '🖥️',
                         default => $state,
                     }),
 
@@ -336,27 +422,68 @@ class SaleResource extends Resource
 
                 Tables\Columns\TextColumn::make('client.name')
                     ->label('Cliente')
-                    ->searchable(),
+                    ->searchable()
+                    ->limit(30),
 
-                // Muestra los productos en lista
-                Tables\Columns\TextColumn::make('items.product.name')
-                    ->label('Artículos')
-                    ->listWithLineBreaks()
-                    ->limitList(2)
-                    ->bulleted(),
+                Tables\Columns\TextColumn::make('items_count')
+                    ->label('Items')
+                    ->counts('items')
+                    ->badge()
+                    ->color('info'),
 
                 Tables\Columns\TextColumn::make('paymentMethod.name')
                     ->label('Pago')
                     ->badge()
-                    ->color('gray'),
+                    ->color('gray')
+                    ->limit(20),
 
                 Tables\Columns\TextColumn::make('total_amount')
                     ->label('Total')
                     ->money('USD')
                     ->weight('bold')
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('refunded_at')
+                    ->label('Estado')
+                    ->badge()
+                    ->formatStateUsing(fn ($state, $record) =>
+                        $record->isRefunded() ? 'REEMB.' :
+                        ($record->isProviderCredit() ? 'Crédito' : 'OK')
+                    )
+                    ->color(fn ($record) =>
+                        $record->isRefunded() ? 'danger' :
+                        ($record->isProviderCredit() ? 'warning' : 'success')
+                    )
+                    ->icon(fn ($record) =>
+                        $record->isRefunded() ? 'heroicon-o-arrow-uturn-left' :
+                        ($record->isProviderCredit() ? 'heroicon-o-credit-card' : 'heroicon-o-check-circle')
+                    ),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('source')
+                    ->label('Origen')
+                    ->options([
+                        'store' => '🏪 Tienda',
+                        'server' => '🖥️ Servidor',
+                    ])
+                    ->placeholder('Todos'),
+
+                Tables\Filters\SelectFilter::make('payment_method_id')
+                    ->label('Método de Pago')
+                    ->relationship('paymentMethod', 'name')
+                    ->placeholder('Todos'),
+
+                Tables\Filters\Filter::make('refunded')
+                    ->label('Solo Reembolsadas')
+                    ->query(fn ($query) => $query->whereNotNull('refunded_at')),
+
+                Tables\Filters\Filter::make('not_refunded')
+                    ->label('Sin Reembolsar')
+                    ->query(fn ($query) => $query->whereNull('refunded_at'))
+                    ->default(),
             ])
             ->defaultSort('created_at', 'desc')
+            ->recordClasses(fn ($record) => $record->isRefunded() ? 'opacity-50 line-through' : null)
             ->actions([
                 Tables\Actions\EditAction::make(),
             ]);
@@ -376,5 +503,18 @@ class SaleResource extends Resource
             'create' => Pages\CreateSale::route('/create'),
             'edit' => Pages\EditSale::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Verificar si el método de pago seleccionado es "Créditos Servidor"
+     */
+    private static function isServerCreditsPayment($paymentMethodId): bool
+    {
+        if (!$paymentMethodId) {
+            return false;
+        }
+
+        $paymentMethod = \App\Models\PaymentMethod::find($paymentMethodId);
+        return $paymentMethod && $paymentMethod->name === 'Créditos Servidor';
     }
 }
