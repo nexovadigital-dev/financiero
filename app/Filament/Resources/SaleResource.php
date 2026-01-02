@@ -99,6 +99,62 @@ class SaleResource extends Resource
                                     ->visible(fn (Get $get) => !$get('without_supplier'))
                                     ->live(),
 
+                                // Mostrar balance disponible del proveedor
+                                Forms\Components\Placeholder::make('supplier_balance_info')
+                                    ->label('💰 Balance Disponible')
+                                    ->content(function (Get $get) {
+                                        $supplierId = $get('supplier_id');
+                                        if (!$supplierId) {
+                                            return 'Seleccione un proveedor';
+                                        }
+
+                                        $supplier = \App\Models\Supplier::find($supplierId);
+                                        if (!$supplier) {
+                                            return 'Proveedor no encontrado';
+                                        }
+
+                                        $balance = $supplier->balance ?? 0;
+                                        $color = $balance > 0 ? 'green' : 'red';
+
+                                        return new \Illuminate\Support\HtmlString(
+                                            "<span style='font-size: 1.2rem; font-weight: bold; color: {$color};'>\$" .
+                                            number_format($balance, 2) . " USD</span>"
+                                        );
+                                    })
+                                    ->visible(fn (Get $get) => self::isServerCreditsPayment($get('payment_method_id')) && $get('supplier_id') && !$get('without_supplier')),
+
+                                // Mostrar costo base total que se debitará
+                                Forms\Components\Placeholder::make('base_cost_info')
+                                    ->label('📊 Costo Base (se debitará)')
+                                    ->content(function (Get $get) {
+                                        $items = $get('items') ?? [];
+                                        $totalBaseCost = 0;
+
+                                        foreach ($items as $item) {
+                                            $basePrice = floatval($item['base_price'] ?? 0);
+                                            $qty = intval($item['quantity'] ?? 1);
+                                            $totalBaseCost += ($basePrice * $qty);
+                                        }
+
+                                        $supplierId = $get('supplier_id');
+                                        $supplier = $supplierId ? \App\Models\Supplier::find($supplierId) : null;
+                                        $balance = $supplier ? ($supplier->balance ?? 0) : 0;
+
+                                        $hasEnough = $balance >= $totalBaseCost;
+                                        $color = $hasEnough ? 'orange' : 'red';
+                                        $icon = $hasEnough ? '✓' : '⚠️';
+
+                                        $html = "<span style='font-size: 1.1rem; font-weight: bold; color: {$color};'>{$icon} \$" .
+                                            number_format($totalBaseCost, 2) . " USD</span>";
+
+                                        if (!$hasEnough && $totalBaseCost > 0) {
+                                            $html .= "<br><span style='color: red; font-weight: bold;'>❌ Balance insuficiente</span>";
+                                        }
+
+                                        return new \Illuminate\Support\HtmlString($html);
+                                    })
+                                    ->visible(fn (Get $get) => self::isServerCreditsPayment($get('payment_method_id')) && $get('supplier_id') && !$get('without_supplier')),
+
                                 Forms\Components\Select::make('source')
                                     ->label('Origen de Venta')
                                     ->options([
