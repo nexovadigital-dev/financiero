@@ -486,6 +486,32 @@ class SaleResource extends Resource
             ->recordClasses(fn ($record) => $record->isRefunded() ? 'opacity-50 line-through' : null)
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->requiresConfirmation()
+                    ->modalHeading('Eliminar Venta')
+                    ->modalDescription(fn ($record) =>
+                        $record->isProviderCredit() && !$record->without_supplier && !$record->isRefunded()
+                            ? '⚠️ ADVERTENCIA: Esta es una venta de créditos. Al eliminarla, se restaurará el balance del proveedor.'
+                            : '¿Está seguro que desea eliminar esta venta?'
+                    )
+                    ->modalSubmitActionLabel('Sí, eliminar')
+                    ->before(function ($record) {
+                        // Si es una venta de créditos activa, restaurar balance antes de eliminar
+                        if ($record->isProviderCredit() && !$record->without_supplier && !$record->isRefunded() && $record->supplier) {
+                            $totalBaseCost = $record->items->sum(function ($item) {
+                                return ($item->base_price ?? 0) * $item->quantity;
+                            });
+                            $amountToRefund = $totalBaseCost > 0 ? $totalBaseCost : $record->amount_usd;
+
+                            $record->supplier->addToBalance($amountToRefund);
+
+                            \Log::info('💰 Balance restaurado por eliminación de venta', [
+                                'sale_id' => $record->id,
+                                'supplier' => $record->supplier->name,
+                                'amount_restored' => $amountToRefund,
+                            ]);
+                        }
+                    }),
             ]);
     }
 

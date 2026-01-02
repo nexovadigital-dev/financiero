@@ -44,7 +44,7 @@ class ProductResource extends Resource
      */
     protected static function getPricePackageFields(): array
     {
-        $packages = PricePackage::where('is_active', true)->orderBy('order')->get();
+        $packages = PricePackage::where('is_active', true)->orderBy('sort_order')->get();
 
         if ($packages->isEmpty()) {
             return [
@@ -57,7 +57,7 @@ class ProductResource extends Resource
 
         $fields = [];
         foreach ($packages as $package) {
-            $fieldName = 'price_package_' . $package->order;
+            $fieldName = 'price_package_' . $package->sort_order;
             $fields[] = Forms\Components\TextInput::make($fieldName)
                 ->label("📦 {$package->name}")
                 ->numeric()

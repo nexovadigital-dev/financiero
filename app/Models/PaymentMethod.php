@@ -18,4 +18,22 @@ class PaymentMethod extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
+
+    /**
+     * Verificar si este método de pago es "Créditos Servidor"
+     * Se usa para determinar si la venta debe debitar balance del proveedor
+     */
+    public function isServerCredits(): bool
+    {
+        // Verificar por nombre (case insensitive)
+        $serverCreditNames = [
+            'créditos servidor',
+            'creditos servidor',
+            'server credits',
+            'crédito servidor',
+            'credito servidor',
+        ];
+
+        return in_array(strtolower(trim($this->name)), $serverCreditNames);
+    }
 }
