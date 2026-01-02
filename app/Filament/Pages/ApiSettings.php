@@ -2,12 +2,14 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\Setting;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Pages\Page;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Artisan;
 
 class ApiSettings extends Page implements HasForms
 {
@@ -23,18 +25,54 @@ class ApiSettings extends Page implements HasForms
 
     public ?array $data = [];
 
+    /**
+     * Obtener credenciales WooCommerce (BD > .env)
+     */
+    public static function getWooUrl(): ?string
+    {
+        return Setting::get('woo_url') ?: env('WOO_URL');
+    }
+
+    public static function getWooKey(): ?string
+    {
+        return Setting::get('woo_key') ?: env('WOO_KEY');
+    }
+
+    public static function getWooSecret(): ?string
+    {
+        return Setting::get('woo_secret') ?: env('WOO_SECRET');
+    }
+
+    /**
+     * Obtener credenciales DHRU (BD > .env)
+     */
+    public static function getDhruUrl(): ?string
+    {
+        return Setting::get('dhru_url') ?: env('DHRU_URL');
+    }
+
+    public static function getDhruKey(): ?string
+    {
+        return Setting::get('dhru_key') ?: env('DHRU_KEY');
+    }
+
+    public static function getDhruUsername(): ?string
+    {
+        return Setting::get('dhru_username') ?: env('DHRU_USERNAME');
+    }
+
     public function mount(): void
     {
         $this->form->fill([
-            // WooCommerce
-            'woocommerce_url' => env('WOO_URL'),
-            'woocommerce_consumer_key' => env('WOO_KEY'),
-            'woocommerce_consumer_secret' => env('WOO_SECRET'),
+            // WooCommerce - Prioridad: BD > .env
+            'woocommerce_url' => static::getWooUrl(),
+            'woocommerce_consumer_key' => static::getWooKey(),
+            'woocommerce_consumer_secret' => static::getWooSecret(),
 
-            // DHRU
-            'dhru_api_url' => env('DHRU_URL'),
-            'dhru_api_key' => env('DHRU_KEY'),
-            'dhru_username' => env('DHRU_USERNAME'),
+            // DHRU - Prioridad: BD > .env
+            'dhru_api_url' => static::getDhruUrl(),
+            'dhru_api_key' => static::getDhruKey(),
+            'dhru_username' => static::getDhruUsername(),
         ]);
     }
 
@@ -43,9 +81,9 @@ class ApiSettings extends Page implements HasForms
      */
     public function isWooCommerceConnected(): bool
     {
-        return !empty(env('WOO_URL'))
-            && !empty(env('WOO_KEY'))
-            && !empty(env('WOO_SECRET'));
+        return !empty(static::getWooUrl())
+            && !empty(static::getWooKey())
+            && !empty(static::getWooSecret());
     }
 
     /**
@@ -53,8 +91,8 @@ class ApiSettings extends Page implements HasForms
      */
     public function isDhruConnected(): bool
     {
-        return !empty(env('DHRU_URL'))
-            && !empty(env('DHRU_KEY'));
+        return !empty(static::getDhruUrl())
+            && !empty(static::getDhruKey());
     }
 
     public function form(Form $form): Form
@@ -72,12 +110,12 @@ class ApiSettings extends Page implements HasForms
                             ->color('danger')
                             ->requiresConfirmation()
                             ->modalHeading('¿Desconectar WooCommerce API?')
-                            ->modalDescription('Se eliminarán todas las credenciales de WooCommerce del archivo .env. Esta acción requiere confirmación.')
+                            ->modalDescription('Se eliminarán todas las credenciales de WooCommerce. Esta acción requiere confirmación.')
                             ->modalSubmitActionLabel('Sí, Desconectar')
                             ->action(function () {
-                                $this->updateEnvVariable('WOO_URL', '');
-                                $this->updateEnvVariable('WOO_KEY', '');
-                                $this->updateEnvVariable('WOO_SECRET', '');
+                                Setting::set('woo_url', null, 'api');
+                                Setting::set('woo_key', null, 'api');
+                                Setting::set('woo_secret', null, 'api');
 
                                 $this->form->fill([
                                     'woocommerce_url' => null,
@@ -88,10 +126,10 @@ class ApiSettings extends Page implements HasForms
                                 Notification::make()
                                     ->warning()
                                     ->title('WooCommerce Desconectado')
-                                    ->body('Las credenciales han sido eliminadas del archivo .env')
+                                    ->body('Las credenciales han sido eliminadas')
                                     ->send();
 
-                                redirect()->to(request()->header('Referer'));
+                                $this->redirect(request()->header('Referer'));
                             })
                             ->visible(fn () => $this->isWooCommerceConnected()),
                     ])
@@ -111,8 +149,8 @@ class ApiSettings extends Page implements HasForms
                             ->view('filament.components.api-info', [
                                 'connected' => $this->isWooCommerceConnected(),
                                 'items' => $this->isWooCommerceConnected() ? [
-                                    ['icon' => '🌐', 'label' => 'URL', 'value' => env('WOO_URL')],
-                                    ['icon' => '🔑', 'label' => 'Consumer Key', 'value' => substr(env('WOO_KEY'), 0, 15) . '...'],
+                                    ['icon' => '🌐', 'label' => 'URL', 'value' => static::getWooUrl()],
+                                    ['icon' => '🔑', 'label' => 'Consumer Key', 'value' => substr(static::getWooKey() ?? '', 0, 15) . '...'],
                                     ['icon' => '🔒', 'label' => 'Consumer Secret', 'value' => 'Configurado'],
                                 ] : [],
                             ])
@@ -159,12 +197,12 @@ class ApiSettings extends Page implements HasForms
                             ->color('danger')
                             ->requiresConfirmation()
                             ->modalHeading('¿Desconectar DHRU Fusion API?')
-                            ->modalDescription('Se eliminarán todas las credenciales de DHRU del archivo .env. Esta acción requiere confirmación.')
+                            ->modalDescription('Se eliminarán todas las credenciales de DHRU. Esta acción requiere confirmación.')
                             ->modalSubmitActionLabel('Sí, Desconectar')
                             ->action(function () {
-                                $this->updateEnvVariable('DHRU_URL', '');
-                                $this->updateEnvVariable('DHRU_USERNAME', '');
-                                $this->updateEnvVariable('DHRU_KEY', '');
+                                Setting::set('dhru_url', null, 'api');
+                                Setting::set('dhru_username', null, 'api');
+                                Setting::set('dhru_key', null, 'api');
 
                                 $this->form->fill([
                                     'dhru_api_url' => null,
@@ -175,10 +213,10 @@ class ApiSettings extends Page implements HasForms
                                 Notification::make()
                                     ->warning()
                                     ->title('DHRU Fusion Desconectado')
-                                    ->body('Las credenciales han sido eliminadas del archivo .env')
+                                    ->body('Las credenciales han sido eliminadas')
                                     ->send();
 
-                                redirect()->to(request()->header('Referer'));
+                                $this->redirect(request()->header('Referer'));
                             })
                             ->visible(fn () => $this->isDhruConnected()),
                     ])
@@ -198,9 +236,9 @@ class ApiSettings extends Page implements HasForms
                             ->view('filament.components.api-info', [
                                 'connected' => $this->isDhruConnected(),
                                 'items' => $this->isDhruConnected() ? [
-                                    ['icon' => '🌐', 'label' => 'URL', 'value' => env('DHRU_URL')],
-                                    ['icon' => '👤', 'label' => 'Usuario', 'value' => env('DHRU_USERNAME') ?: 'No configurado'],
-                                    ['icon' => '🔑', 'label' => 'API Key', 'value' => substr(env('DHRU_KEY'), 0, 15) . '...'],
+                                    ['icon' => '🌐', 'label' => 'URL', 'value' => static::getDhruUrl()],
+                                    ['icon' => '👤', 'label' => 'Usuario', 'value' => static::getDhruUsername() ?: 'No configurado'],
+                                    ['icon' => '🔑', 'label' => 'API Key', 'value' => substr(static::getDhruKey() ?? '', 0, 15) . '...'],
                                 ] : [],
                             ])
                             ->columnSpanFull(),
@@ -241,24 +279,27 @@ class ApiSettings extends Page implements HasForms
         $data = $this->form->getState();
 
         try {
-            // Guardar WooCommerce en .env
-            $this->updateEnvVariable('WOO_URL', $data['woocommerce_url'] ?? '');
-            $this->updateEnvVariable('WOO_KEY', $data['woocommerce_consumer_key'] ?? '');
-            $this->updateEnvVariable('WOO_SECRET', $data['woocommerce_consumer_secret'] ?? '');
+            // Guardar WooCommerce en BD (encriptado)
+            Setting::set('woo_url', $data['woocommerce_url'] ?? null, 'api', false);
+            Setting::set('woo_key', $data['woocommerce_consumer_key'] ?? null, 'api', true);
+            Setting::set('woo_secret', $data['woocommerce_consumer_secret'] ?? null, 'api', true);
 
-            // Guardar DHRU en .env
-            $this->updateEnvVariable('DHRU_URL', $data['dhru_api_url'] ?? '');
-            $this->updateEnvVariable('DHRU_USERNAME', $data['dhru_username'] ?? '');
-            $this->updateEnvVariable('DHRU_KEY', $data['dhru_api_key'] ?? '');
+            // Guardar DHRU en BD (encriptado)
+            Setting::set('dhru_url', $data['dhru_api_url'] ?? null, 'api', false);
+            Setting::set('dhru_username', $data['dhru_username'] ?? null, 'api', false);
+            Setting::set('dhru_key', $data['dhru_api_key'] ?? null, 'api', true);
+
+            // Limpiar cache de config
+            Artisan::call('config:clear');
 
             Notification::make()
                 ->success()
                 ->title('Configuración Guardada')
-                ->body('Las credenciales han sido guardadas en el archivo .env de forma segura.')
+                ->body('Las credenciales han sido guardadas de forma segura en la base de datos.')
                 ->send();
 
             // Refrescar la página
-            redirect()->to(request()->header('Referer'));
+            $this->redirect(request()->header('Referer'));
 
         } catch (\Exception $e) {
             Notification::make()
@@ -267,31 +308,6 @@ class ApiSettings extends Page implements HasForms
                 ->body('No se pudieron guardar las credenciales: ' . $e->getMessage())
                 ->send();
         }
-    }
-
-    /**
-     * Actualizar variable en archivo .env
-     */
-    private function updateEnvVariable(string $key, string $value): void
-    {
-        $envPath = base_path('.env');
-        $envContent = file_get_contents($envPath);
-
-        // Escapar caracteres especiales en el valor
-        $value = str_replace('"', '\"', $value);
-
-        // Buscar si la variable ya existe
-        $pattern = "/^{$key}=.*/m";
-
-        if (preg_match($pattern, $envContent)) {
-            // Actualizar variable existente
-            $envContent = preg_replace($pattern, "{$key}=\"{$value}\"", $envContent);
-        } else {
-            // Agregar nueva variable al final
-            $envContent .= "\n{$key}=\"{$value}\"";
-        }
-
-        file_put_contents($envPath, $envContent);
     }
 
     protected function getFormActions(): array

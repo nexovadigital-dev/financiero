@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
+use App\Models\PricePackage;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -36,6 +37,40 @@ class ProductResource extends Resource
             $details['SKU'] = $record->sku;
         }
         return $details;
+    }
+
+    /**
+     * Genera campos de precio dinámicos basados en los paquetes configurados
+     */
+    protected static function getPricePackageFields(): array
+    {
+        $packages = PricePackage::where('is_active', true)->orderBy('order')->get();
+
+        if ($packages->isEmpty()) {
+            return [
+                Forms\Components\Placeholder::make('no_packages')
+                    ->label('')
+                    ->content('No hay paquetes de precios configurados. Ve a Configuración > Price Packages para crear paquetes.')
+                    ->columnSpanFull(),
+            ];
+        }
+
+        $fields = [];
+        foreach ($packages as $package) {
+            $fieldName = 'price_package_' . $package->order;
+            $fields[] = Forms\Components\TextInput::make($fieldName)
+                ->label("📦 {$package->name}")
+                ->numeric()
+                ->prefix('$')
+                ->default(0)
+                ->minValue(0)
+                ->step(0.01)
+                ->helperText($package->description ?? "Precio para paquete {$package->name}");
+        }
+
+        return [
+            Forms\Components\Grid::make(2)->schema($fields),
+        ];
     }
 
     public static function form(Form $form): Form
@@ -124,46 +159,7 @@ class ProductResource extends Resource
 
                 Forms\Components\Section::make('📦 Precios para Paquetes de Cliente')
                     ->description('Configure los precios de venta para cada paquete de cliente. Estos precios se mostrarán automáticamente según el paquete del cliente.')
-                    ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('price_package_1')
-                                    ->label('📦 Paquete 1 (Premium)')
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->step(0.01)
-                                    ->helperText('Precio para clientes Premium'),
-
-                                Forms\Components\TextInput::make('price_package_2')
-                                    ->label('📦 Paquete 2 (Mayorista)')
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->step(0.01)
-                                    ->helperText('Precio para Mayoristas'),
-
-                                Forms\Components\TextInput::make('price_package_3')
-                                    ->label('📦 Paquete 3 (Minorista)')
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->step(0.01)
-                                    ->helperText('Precio para Minoristas'),
-
-                                Forms\Components\TextInput::make('price_package_4')
-                                    ->label('📦 Paquete 4 (Especial)')
-                                    ->numeric()
-                                    ->prefix('$')
-                                    ->default(0)
-                                    ->minValue(0)
-                                    ->step(0.01)
-                                    ->helperText('Precio Especial'),
-                            ]),
-                    ])
+                    ->schema(static::getPricePackageFields())
                     ->collapsible()
                     ->collapsed(true),
             ]);

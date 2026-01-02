@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ClientResource\Pages;
 
 use App\Filament\Resources\ClientResource;
+use App\Filament\Pages\ApiSettings;
 use App\Models\Client;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
@@ -65,16 +66,24 @@ class ListClients extends ListRecords
 
     public function syncWooClients($searchTerm = null)
     {
-        if (!env('WOO_URL') || !env('WOO_KEY')) {
-            Notification::make()->title('Error: Faltan credenciales en .env')->danger()->send();
+        $wooUrl = ApiSettings::getWooUrl();
+        $wooKey = ApiSettings::getWooKey();
+        $wooSecret = ApiSettings::getWooSecret();
+
+        if (!$wooUrl || !$wooKey || !$wooSecret) {
+            Notification::make()
+                ->title('Error: Faltan credenciales de WooCommerce')
+                ->body('Configura las credenciales en Configuración > Configuración API')
+                ->danger()
+                ->send();
             return;
         }
 
         try {
             $woocommerce = new WooClient(
-                env('WOO_URL'),
-                env('WOO_KEY'),
-                env('WOO_SECRET'),
+                $wooUrl,
+                $wooKey,
+                $wooSecret,
                 ['version' => 'wc/v3', 'verify_ssl' => false, 'timeout' => 60]
             );
 

@@ -5,6 +5,7 @@ namespace App\Filament\Pages\Auth;
 use Filament\Forms\Components\Component;
 use Filament\Forms\Components\TextInput;
 use Filament\Pages\Auth\Login as BaseLogin;
+use Illuminate\Contracts\Support\Htmlable;
 
 class Login extends BaseLogin
 {
@@ -13,9 +14,9 @@ class Login extends BaseLogin
         return 'Acceso Administrador';
     }
 
-    public function getSubHeading(): string
+    public function getSubHeading(): string|Htmlable|null
     {
-        return '© ' . date('Y') . ' NicaGSM - Todos los derechos reservados';
+        return null; // Sin subheading
     }
 
     protected function getForms(): array
@@ -56,5 +57,16 @@ class Login extends BaseLogin
             ->required()
             ->extraInputAttributes(['style' => 'font-size: 1rem;'])
             ->placeholder('Ingrese su contraseña');
+    }
+
+    // Footer con copyright
+    protected function hasFullWidthFormActions(): bool
+    {
+        return true;
+    }
+
+    public function getFooter(): ?string
+    {
+        return '© ' . date('Y') . ' NicaGSM - Todos los derechos reservados';
     }
 }

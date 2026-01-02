@@ -87,6 +87,12 @@ class AdminPanelProvider extends PanelProvider
                 <meta name="description" content="Sistema de administración privado">
             ')
         );
+
+        // Footer con copyright en la página de login
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
+            fn (): string => '<div class="text-center text-sm text-gray-500 dark:text-gray-400 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">© ' . date('Y') . ' NicaGSM - Todos los derechos reservados</div>'
+        );
     }
 
     public function panel(Panel $panel): Panel
