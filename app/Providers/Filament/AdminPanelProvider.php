@@ -31,81 +31,72 @@ class AdminPanelProvider extends PanelProvider
             fn (): string => Blade::render('<link rel="stylesheet" href="{{ asset(\'css/filament-custom.css\') }}">')
         );
 
-        // CSS Inline GLOBAL - Fix de z-index, dropdowns, datepickers y selectores
+        // CSS Inline GLOBAL - Fix de z-index para dropdowns sin romper funcionalidad
         FilamentView::registerRenderHook(
             PanelsRenderHook::HEAD_END,
             fn (): string => '<style>
                 /* ========================================
-                   FIX GLOBAL: DROPDOWNS, SELECTORES, DATEPICKERS
+                   FIX GLOBAL: Z-INDEX SIN ROMPER ALPINE.JS
                    ======================================== */
 
-                /* SELECTORES - Listbox siempre visible por encima */
-                [role="listbox"],
-                .fi-fo-select [role="listbox"],
-                .choices__list--dropdown {
-                    z-index: 99999 !important;
-                    position: fixed !important;
-                }
-
-                /* DATEPICKERS - Panel siempre visible */
-                .fi-fo-date-time-picker [x-ref="panel"],
-                .fi-fo-date-time-picker .fi-dropdown-panel,
-                [x-data*="dateTimePickerFormComponent"] [x-ref="panel"] {
-                    z-index: 99999 !important;
-                    position: fixed !important;
-                    background: white !important;
-                    border-radius: 0.75rem !important;
-                    box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
-                    border: 1px solid #e5e7eb !important;
-                }
-
-                .dark .fi-fo-date-time-picker [x-ref="panel"],
-                .dark .fi-fo-date-time-picker .fi-dropdown-panel {
-                    background: #1f2937 !important;
-                    border-color: #374151 !important;
-                }
-
-                /* DROPDOWNS GLOBALES - Menú usuario, filtros, acciones */
-                [x-data*="dropdown"] [x-ref="panel"],
-                .fi-dropdown-panel,
-                .fi-user-menu-panel,
-                [role="menu"] {
-                    z-index: 99999 !important;
-                    position: fixed !important;
-                }
-
-                /* Dropdowns de tabla - filtros y bulk actions */
-                .fi-ta .fi-dropdown-panel,
-                .fi-ta [role="menu"],
-                .fi-ta-actions [x-data] > div[style*="position"] {
-                    z-index: 99999 !important;
-                    position: fixed !important;
-                }
+                /* IMPORTANTE: No usar position:fixed - rompe Alpine.js */
 
                 /* SECCIONES - Overflow visible para que dropdowns no se corten */
                 .fi-section,
                 .fi-section-content,
-                .fi-fo-field-wrp,
-                .fi-form,
-                .fi-form > div {
+                .fi-fo-field-wrp {
                     overflow: visible !important;
                 }
 
-                /* Modales SIEMPRE por encima de todo */
-                .fi-modal,
-                [role="dialog"],
+                /* DATEPICKERS - Fondo sólido y z-index alto */
+                .fi-fo-date-time-picker [x-ref="panel"] {
+                    z-index: 50 !important;
+                    background: white !important;
+                    border-radius: 0.75rem !important;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.2) !important;
+                    border: 1px solid #e5e7eb !important;
+                }
+
+                .dark .fi-fo-date-time-picker [x-ref="panel"] {
+                    background: #1f2937 !important;
+                    border-color: #374151 !important;
+                }
+
+                /* SELECTORES - z-index para listbox */
+                [role="listbox"] {
+                    z-index: 50 !important;
+                }
+
+                /* Modales - z-index más alto que todo */
+                .fi-modal {
+                    z-index: 100 !important;
+                }
+
+                /* Backdrop del modal */
+                .fi-modal-close-overlay,
+                [x-data] > div[aria-hidden="true"] {
+                    z-index: 99 !important;
+                }
+
+                /* Contenido del modal sobre el backdrop */
                 .fi-modal-window {
-                    z-index: 999999 !important;
+                    z-index: 101 !important;
                 }
 
-                .fi-modal-content {
-                    z-index: 999999 !important;
-                    overflow-y: auto;
+                /* Selectores y datepickers DENTRO de modales - mayor z-index */
+                .fi-modal [role="listbox"],
+                .fi-modal .fi-fo-date-time-picker [x-ref="panel"] {
+                    z-index: 102 !important;
                 }
 
-                /* Notificaciones por encima */
+                /* Notificaciones siempre visibles */
                 .fi-notification {
-                    z-index: 9999999 !important;
+                    z-index: 200 !important;
+                }
+
+                /* Dropdown del menú de usuario */
+                .fi-dropdown-panel {
+                    z-index: 50 !important;
                 }
             </style>'
         );
