@@ -25,47 +25,15 @@
    CORRECCIONES DE LAYOUT Y Z-INDEX
    ================================== */
 
-/* JERARQUÍA DE Z-INDEX COHERENTE:
-   - Widgets/Cards: 1
-   - Formularios: 10
-   - Campos: 20
+/* IMPORTANTE: NO modificar z-index de formularios y campos
+   porque crea stacking contexts que interfieren con modales.
+   Solo definir z-index para elementos superpuestos:
    - Dropdowns/Datepickers: 50
-   - Modal backdrop: 100
-   - Modal window: 110
-   - Dropdowns EN modales: 120
+   - Modal: 40 (Filament default)
    - Notificaciones: 200
 */
 
-/* Widgets y estadísticas - NIVEL BASE */
-.fi-wi,
-.fi-wi-stats-overview,
-.fi-wi-stats-overview-stat,
-.fi-page-header-widgets,
-.fi-page-header-ctn {
-    z-index: 1 !important;
-}
-
-/* Formularios - NIVEL MEDIO */
-.fi-fo,
-.fi-fo-section,
-.fi-section-content-ctn,
-.fi-fo .fi-grid {
-    z-index: 10 !important;
-}
-
-.fi-fo-section {
-    margin-bottom: 2rem !important;
-}
-
-/* Campos de formulario */
-.fi-fo-field-wrp,
-.fi-fo-field-wrp select,
-.fi-select-button,
-.fi-input-wrp {
-    z-index: 20 !important;
-}
-
-/* DROPDOWNS Y DATEPICKERS - Por encima de campos */
+/* DROPDOWNS Y DATEPICKERS - Solo estos necesitan z-index */
 div[role="listbox"],
 ul[role="listbox"],
 [role="listbox"],
@@ -109,34 +77,14 @@ ul[role="listbox"],
     z-index: 50 !important;
 }
 
-/* MODALES - Nivel alto */
-.fi-modal-close-overlay {
-    z-index: 100 !important;
-}
-
-.fi-modal {
-    z-index: 105 !important;
-}
-
-.fi-modal-window,
-[role="dialog"],
-[role="alertdialog"] {
-    z-index: 110 !important;
-}
-
-/* DROPDOWNS DENTRO DE MODALES - Nivel más alto que modal */
-.fi-modal div[role="listbox"],
-.fi-modal ul[role="listbox"],
-.fi-modal [role="listbox"],
-.fi-modal .fi-dropdown-panel,
-.fi-modal [role="menu"],
-.fi-modal .fi-fo-date-time-picker [x-ref="panel"] {
-    z-index: 120 !important;
-}
-
-/* NOTIFICACIONES - Siempre visibles */
+/* NOTIFICACIONES - Siempre visibles por encima de todo */
 .fi-notification {
     z-index: 200 !important;
+}
+
+/* Espaciado de secciones de formulario */
+.fi-fo-section {
+    margin-bottom: 2rem !important;
 }
 
 /* ==================================
