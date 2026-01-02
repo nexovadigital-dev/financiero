@@ -31,50 +31,116 @@ class AdminPanelProvider extends PanelProvider
             fn (): string => Blade::render('<link rel="stylesheet" href="{{ asset(\'css/filament-custom.css\') }}">')
         );
 
-        // CSS Inline para fix de z-index y dropdowns
+        // CSS Inline GLOBAL - Fix de z-index, dropdowns, datepickers y selectores
         FilamentView::registerRenderHook(
             PanelsRenderHook::HEAD_END,
             fn (): string => '<style>
+                /* ========================================
+                   FIX GLOBAL: DROPDOWNS, SELECTORES, DATEPICKERS
+                   ======================================== */
+
+                /* SELECTORES - Listbox siempre visible por encima */
+                [role="listbox"],
+                .fi-fo-select [role="listbox"],
+                .choices__list--dropdown {
+                    z-index: 99999 !important;
+                    position: fixed !important;
+                }
+
+                /* DATEPICKERS - Panel siempre visible */
+                .fi-fo-date-time-picker [x-ref="panel"],
+                .fi-fo-date-time-picker .fi-dropdown-panel,
+                [x-data*="dateTimePickerFormComponent"] [x-ref="panel"] {
+                    z-index: 99999 !important;
+                    position: fixed !important;
+                    background: white !important;
+                    border-radius: 0.75rem !important;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.15) !important;
+                    border: 1px solid #e5e7eb !important;
+                }
+
+                .dark .fi-fo-date-time-picker [x-ref="panel"],
+                .dark .fi-fo-date-time-picker .fi-dropdown-panel {
+                    background: #1f2937 !important;
+                    border-color: #374151 !important;
+                }
+
                 /* DROPDOWNS GLOBALES - Menú usuario, filtros, acciones */
-                [x-data*="dropdown"],
-                [x-data*="Dropdown"],
+                [x-data*="dropdown"] [x-ref="panel"],
                 .fi-dropdown-panel,
                 .fi-user-menu-panel,
                 [role="menu"] {
-                    z-index: 999999 !important;
+                    z-index: 99999 !important;
                     position: fixed !important;
                 }
 
                 /* Dropdowns de tabla - filtros y bulk actions */
                 .fi-ta .fi-dropdown-panel,
                 .fi-ta [role="menu"],
-                .fi-ta-actions [x-data] > div[style*="position"],
-                [x-data*="tableColumnSearchIndicator"],
-                [x-data*="tableFiltersIndicator"] {
-                    z-index: 999999 !important;
+                .fi-ta-actions [x-data] > div[style*="position"] {
+                    z-index: 99999 !important;
                     position: fixed !important;
                 }
 
-                /* Z-index para dropdowns en formularios */
-                .fi-form .fi-dropdown-panel,
-                .fi-form [role="menu"],
-                .fi-form [role="listbox"] {
-                    z-index: 9999 !important;
+                /* SECCIONES - Overflow visible para que dropdowns no se corten */
+                .fi-section,
+                .fi-section-content,
+                .fi-fo-field-wrp,
+                .fi-form,
+                .fi-form > div {
+                    overflow: visible !important;
                 }
 
                 /* Modales SIEMPRE por encima de todo */
                 .fi-modal,
                 [role="dialog"],
                 .fi-modal-window {
-                    z-index: 99999 !important;
+                    z-index: 999999 !important;
                 }
 
-                /* Contenido de modal scrollable */
                 .fi-modal-content {
-                    z-index: 99999 !important;
+                    z-index: 999999 !important;
                     overflow-y: auto;
                 }
+
+                /* Notificaciones por encima */
+                .fi-notification {
+                    z-index: 9999999 !important;
+                }
             </style>'
+        );
+
+        // JavaScript para manejar sesión expirada
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_END,
+            fn (): string => '<script>
+                // Interceptar errores de sesión expirada
+                document.addEventListener("livewire:init", () => {
+                    Livewire.hook("request", ({ fail }) => {
+                        fail(({ status, content }) => {
+                            if (status === 419 || status === 401 || status === 403) {
+                                // Crear modal de sesión expirada
+                                const modal = document.createElement("div");
+                                modal.innerHTML = `
+                                    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999999;display:flex;align-items:center;justify-content:center;">
+                                        <div style="background:white;padding:2rem;border-radius:1rem;max-width:400px;text-align:center;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+                                            <svg style="width:64px;height:64px;margin:0 auto 1rem;color:#f59e0b;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                            </svg>
+                                            <h2 style="font-size:1.25rem;font-weight:600;color:#1f2937;margin-bottom:0.5rem;">Sesión Expirada</h2>
+                                            <p style="color:#6b7280;margin-bottom:1.5rem;">Tu sesión ha caducado por inactividad. Por favor, inicia sesión nuevamente.</p>
+                                            <button onclick="window.location.href=\'/admin/login\'" style="background:#7cbd2b;color:white;padding:0.75rem 2rem;border-radius:0.5rem;font-weight:500;border:none;cursor:pointer;">
+                                                Iniciar Sesión
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                                document.body.appendChild(modal);
+                            }
+                        });
+                    });
+                });
+            </script>'
         );
 
         // Meta tags para prevenir indexación en buscadores
