@@ -20,6 +20,7 @@ class Expense extends Model
         'payment_date',
         'description',
         'amount_usd',
+        'credits_received',
         'exchange_rate_used',
         'manually_converted',
         'payment_reference',
@@ -29,6 +30,7 @@ class Expense extends Model
         'payment_date' => 'date',
         'amount' => 'decimal:2',
         'amount_usd' => 'decimal:2',
+        'credits_received' => 'decimal:2',
         'exchange_rate_used' => 'decimal:6',
         'manually_converted' => 'boolean',
     ];

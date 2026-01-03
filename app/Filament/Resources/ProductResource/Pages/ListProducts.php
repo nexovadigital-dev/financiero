@@ -14,24 +14,24 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
 
 class ListProducts extends ListRecords
 {
     protected static string $resource = ProductResource::class;
 
     /**
-     * Cache para productos de WooCommerce (evita múltiples llamadas API)
+     * Obtener productos de WooCommerce (guarda en sesión para persistir entre requests)
      */
-    protected static ?array $wooProductsCache = null;
-
-    /**
-     * Obtener productos de WooCommerce (con cache)
-     */
-    protected static function fetchWooCommerceProducts(): array
+    protected static function fetchWooCommerceProducts(bool $forceRefresh = false): array
     {
-        // Si ya tenemos cache, usarlo
-        if (self::$wooProductsCache !== null) {
-            return self::$wooProductsCache;
+        // Verificar si tenemos datos en sesión y no se fuerza refresh
+        if (!$forceRefresh && Session::has('woo_products_data')) {
+            $sessionData = Session::get('woo_products_data');
+            // Verificar que los datos no tengan más de 5 minutos
+            if (isset($sessionData['timestamp']) && (time() - $sessionData['timestamp']) < 300) {
+                return $sessionData;
+            }
         }
 
         $wooUrl = ApiSettings::getWooUrl();
@@ -39,7 +39,7 @@ class ListProducts extends ListRecords
         $wooSecret = ApiSettings::getWooSecret();
 
         if (!$wooUrl || !$wooKey || !$wooSecret) {
-            return ['error' => 'Credenciales no configuradas'];
+            return ['error' => 'Credenciales no configuradas. Configure en Configuración > Configuración API'];
         }
 
         try {
@@ -85,8 +85,20 @@ class ListProducts extends ListRecords
                 }
             }
 
-            self::$wooProductsCache = ['products' => $wooProducts];
-            return self::$wooProductsCache;
+            $result = [
+                'products' => $wooProducts,
+                'timestamp' => time(),
+            ];
+
+            // Guardar en sesión para persistir entre requests
+            Session::put('woo_products_data', $result);
+
+            Log::info('WooCommerce Products Fetched', [
+                'count' => count($wooProducts),
+                'product_ids' => array_keys($wooProducts),
+            ]);
+
+            return $result;
 
         } catch (\Exception $e) {
             Log::error('Error WooCommerce: ' . $e->getMessage());
@@ -129,10 +141,8 @@ class ListProducts extends ListRecords
             ->modalSubmitActionLabel('Importar Seleccionados')
             ->modalCancelActionLabel('Cancelar')
             ->form(function (): array {
-                // Limpiar cache para obtener datos frescos
-                self::$wooProductsCache = null;
-
-                $result = self::fetchWooCommerceProducts();
+                // Forzar refresh para obtener datos frescos
+                $result = self::fetchWooCommerceProducts(forceRefresh: true);
 
                 if (isset($result['error'])) {
                     return [
@@ -208,6 +218,11 @@ class ListProducts extends ListRecords
             ->action(function (array $data): void {
                 $selectedIds = $data['selected_products'] ?? [];
 
+                Log::info('WooCommerce Action Started', [
+                    'selected_ids_raw' => $selectedIds,
+                    'data_keys' => array_keys($data),
+                ]);
+
                 if (empty($selectedIds)) {
                     Notification::make()
                         ->warning()
@@ -220,14 +235,18 @@ class ListProducts extends ListRecords
                 // Normalizar selectedIds a strings
                 $selectedIds = array_map('strval', $selectedIds);
 
-                // Re-obtener los productos de WooCommerce (usa cache si está disponible)
-                $result = self::fetchWooCommerceProducts();
+                // Obtener los productos de sesión (fueron guardados cuando se abrió el modal)
+                $result = self::fetchWooCommerceProducts(forceRefresh: false);
 
                 if (isset($result['error']) || empty($result['products'])) {
+                    Log::error('WooCommerce Import: No products in session', [
+                        'result' => $result,
+                        'session_has' => Session::has('woo_products_data'),
+                    ]);
                     Notification::make()
                         ->danger()
                         ->title('Error')
-                        ->body('No se pudieron obtener los productos de WooCommerce. Intente nuevamente.')
+                        ->body('No se pudieron obtener los productos. Cierre el modal e intente nuevamente.')
                         ->send();
                     return;
                 }
@@ -236,7 +255,9 @@ class ListProducts extends ListRecords
 
                 Log::info('WooCommerce Import Starting', [
                     'selected_count' => count($selectedIds),
+                    'selected_ids' => $selectedIds,
                     'available_count' => count($productsData),
+                    'available_ids' => array_keys($productsData),
                 ]);
 
                 // Obtener el primer proveedor para asignar precio base
@@ -304,8 +325,14 @@ class ListProducts extends ListRecords
                     }
                 }
 
-                // Limpiar cache después de importar
-                self::$wooProductsCache = null;
+                // Limpiar sesión después de importar
+                Session::forget('woo_products_data');
+
+                Log::info('WooCommerce Import Completed', [
+                    'new_count' => $count,
+                    'updated_count' => $updated,
+                    'errors_count' => count($errors),
+                ]);
 
                 $message = "Se importaron {$count} productos nuevos y se actualizaron {$updated} existentes";
                 if ($firstSupplier) {
