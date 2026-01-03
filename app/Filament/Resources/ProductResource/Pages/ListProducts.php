@@ -19,6 +19,81 @@ class ListProducts extends ListRecords
 {
     protected static string $resource = ProductResource::class;
 
+    /**
+     * Cache para productos de WooCommerce (evita múltiples llamadas API)
+     */
+    protected static ?array $wooProductsCache = null;
+
+    /**
+     * Obtener productos de WooCommerce (con cache)
+     */
+    protected static function fetchWooCommerceProducts(): array
+    {
+        // Si ya tenemos cache, usarlo
+        if (self::$wooProductsCache !== null) {
+            return self::$wooProductsCache;
+        }
+
+        $wooUrl = ApiSettings::getWooUrl();
+        $wooKey = ApiSettings::getWooKey();
+        $wooSecret = ApiSettings::getWooSecret();
+
+        if (!$wooUrl || !$wooKey || !$wooSecret) {
+            return ['error' => 'Credenciales no configuradas'];
+        }
+
+        try {
+            $woocommerce = new Client(
+                $wooUrl,
+                $wooKey,
+                $wooSecret,
+                ['version' => 'wc/v3', 'verify_ssl' => true, 'timeout' => 120]
+            );
+
+            $products = $woocommerce->get('products', ['per_page' => 100, 'status' => 'any']);
+            $wooProducts = [];
+
+            foreach ($products as $product) {
+                if ($product->type === 'variable') {
+                    $variations = $woocommerce->get("products/{$product->id}/variations", ['per_page' => 50]);
+                    foreach ($variations as $variation) {
+                        $attributes = array_map(fn($attr) => $attr->option, $variation->attributes);
+                        $variationName = $product->name . ' - ' . implode(', ', $attributes);
+                        $varExistsInDb = Product::where('woocommerce_product_id', $variation->id)->exists();
+
+                        $wooProducts[(string)$variation->id] = [
+                            'id' => $variation->id,
+                            'name' => $variationName,
+                            'price' => floatval($variation->price ?: 0),
+                            'sku' => $variation->sku ?: '',
+                            'status' => $product->status,
+                            'stock_status' => $variation->stock_status ?? 'instock',
+                            'exists' => $varExistsInDb,
+                        ];
+                    }
+                } else {
+                    $existsInDb = Product::where('woocommerce_product_id', $product->id)->exists();
+                    $wooProducts[(string)$product->id] = [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'price' => floatval($product->price ?: 0),
+                        'sku' => $product->sku ?: '',
+                        'status' => $product->status,
+                        'stock_status' => $product->stock_status ?? 'instock',
+                        'exists' => $existsInDb,
+                    ];
+                }
+            }
+
+            self::$wooProductsCache = ['products' => $wooProducts];
+            return self::$wooProductsCache;
+
+        } catch (\Exception $e) {
+            Log::error('Error WooCommerce: ' . $e->getMessage());
+            return ['error' => $e->getMessage()];
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -54,144 +129,84 @@ class ListProducts extends ListRecords
             ->modalSubmitActionLabel('Importar Seleccionados')
             ->modalCancelActionLabel('Cancelar')
             ->form(function (): array {
-                // Verificar credenciales
-                $wooUrl = ApiSettings::getWooUrl();
-                $wooKey = ApiSettings::getWooKey();
-                $wooSecret = ApiSettings::getWooSecret();
+                // Limpiar cache para obtener datos frescos
+                self::$wooProductsCache = null;
 
-                if (!$wooUrl || !$wooKey || !$wooSecret) {
+                $result = self::fetchWooCommerceProducts();
+
+                if (isset($result['error'])) {
                     return [
                         Forms\Components\Placeholder::make('error')
                             ->label('')
                             ->content(new \Illuminate\Support\HtmlString(
                                 '<div class="p-4 bg-red-50 border border-red-200 rounded-lg">
-                                    <p class="text-red-800 font-medium">❌ Credenciales no configuradas</p>
-                                    <p class="text-red-600 text-sm mt-1">Configure las credenciales de WooCommerce en Configuración > Configuración API</p>
+                                    <p class="text-red-800 font-medium">❌ Error</p>
+                                    <p class="text-red-600 text-sm mt-1">' . htmlspecialchars($result['error']) . '</p>
                                 </div>'
                             )),
                     ];
                 }
 
-                // Obtener productos de WooCommerce
-                try {
-                    $woocommerce = new Client(
-                        $wooUrl,
-                        $wooKey,
-                        $wooSecret,
-                        ['version' => 'wc/v3', 'verify_ssl' => true, 'timeout' => 120]
+                $wooProducts = $result['products'] ?? [];
+
+                if (empty($wooProducts)) {
+                    return [
+                        Forms\Components\Placeholder::make('empty')
+                            ->label('')
+                            ->content('No se encontraron productos en WooCommerce'),
+                    ];
+                }
+
+                // Crear opciones y descripciones
+                $options = [];
+                $descriptions = [];
+                foreach ($wooProducts as $id => $product) {
+                    $status = $product['exists'] ? '🔄' : '🆕';
+                    $options[(string)$id] = $product['name'];
+                    $descriptions[(string)$id] = sprintf(
+                        '%s %s | $%.2f USD | SKU: %s',
+                        $status,
+                        $product['exists'] ? 'Actualizar' : 'Nuevo',
+                        $product['price'],
+                        $product['sku'] ?: 'N/A'
                     );
-
-                    $products = $woocommerce->get('products', ['per_page' => 100, 'status' => 'any']);
-                    $wooProducts = [];
-
-                    foreach ($products as $product) {
-                        if ($product->type === 'variable') {
-                            $variations = $woocommerce->get("products/{$product->id}/variations", ['per_page' => 50]);
-                            foreach ($variations as $variation) {
-                                $attributes = array_map(fn($attr) => $attr->option, $variation->attributes);
-                                $variationName = $product->name . ' - ' . implode(', ', $attributes);
-                                $varExistsInDb = Product::where('woocommerce_product_id', $variation->id)->exists();
-
-                                $wooProducts[$variation->id] = [
-                                    'id' => $variation->id,
-                                    'name' => $variationName,
-                                    'price' => floatval($variation->price ?: 0),
-                                    'sku' => $variation->sku ?: '',
-                                    'status' => $product->status,
-                                    'stock_status' => $variation->stock_status ?? 'instock',
-                                    'exists' => $varExistsInDb,
-                                ];
-                            }
-                        } else {
-                            $existsInDb = Product::where('woocommerce_product_id', $product->id)->exists();
-                            $wooProducts[$product->id] = [
-                                'id' => $product->id,
-                                'name' => $product->name,
-                                'price' => floatval($product->price ?: 0),
-                                'sku' => $product->sku ?: '',
-                                'status' => $product->status,
-                                'stock_status' => $product->stock_status ?? 'instock',
-                                'exists' => $existsInDb,
-                            ];
-                        }
-                    }
-
-                    if (empty($wooProducts)) {
-                        return [
-                            Forms\Components\Placeholder::make('empty')
-                                ->label('')
-                                ->content('No se encontraron productos en WooCommerce'),
-                        ];
-                    }
-
-                    // Crear opciones y descripciones
-                    $options = [];
-                    $descriptions = [];
-                    foreach ($wooProducts as $id => $product) {
-                        $status = $product['exists'] ? '🔄' : '🆕';
-                        $options[(string)$id] = $product['name'];
-                        $descriptions[(string)$id] = sprintf(
-                            '%s %s | $%.2f USD | SKU: %s',
-                            $status,
-                            $product['exists'] ? 'Actualizar' : 'Nuevo',
-                            $product['price'],
-                            $product['sku'] ?: 'N/A'
-                        );
-                    }
-
-                    $total = count($wooProducts);
-                    $existing = count(array_filter($wooProducts, fn($p) => $p['exists']));
-                    $new = $total - $existing;
-
-                    return [
-                        Forms\Components\Hidden::make('woo_products_data')
-                            ->default(json_encode($wooProducts)),
-
-                        Forms\Components\Section::make('✅ Conexión Exitosa')
-                            ->schema([
-                                Forms\Components\Placeholder::make('stats')
-                                    ->label('')
-                                    ->content(new \Illuminate\Support\HtmlString(
-                                        "<div class='flex gap-4 flex-wrap'>
-                                            <span class='px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium'>📦 Total: {$total}</span>
-                                            <span class='px-3 py-1 bg-green-100 text-green-800 rounded-full font-medium'>🆕 Nuevos: {$new}</span>
-                                            <span class='px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full font-medium'>🔄 Existentes: {$existing}</span>
-                                        </div>"
-                                    )),
-                            ]),
-
-                        Forms\Components\Section::make('Seleccionar Productos')
-                            ->description('Marque los productos que desea importar. El precio se asignará como costo base al primer proveedor.')
-                            ->schema([
-                                Forms\Components\CheckboxList::make('selected_products')
-                                    ->label('')
-                                    ->options($options)
-                                    ->descriptions($descriptions)
-                                    ->columns(1)
-                                    ->searchable()
-                                    ->bulkToggleable()
-                                    ->default(array_keys($options)),
-                            ])
-                            ->collapsible(),
-                    ];
-
-                } catch (\Exception $e) {
-                    Log::error('Error WooCommerce: ' . $e->getMessage());
-                    return [
-                        Forms\Components\Placeholder::make('error')
-                            ->label('')
-                            ->content(new \Illuminate\Support\HtmlString(
-                                '<div class="p-4 bg-red-50 border border-red-200 rounded-lg">
-                                    <p class="text-red-800 font-medium">❌ Error de conexión</p>
-                                    <p class="text-red-600 text-sm mt-1">' . htmlspecialchars($e->getMessage()) . '</p>
-                                </div>'
-                            )),
-                    ];
                 }
+
+                $total = count($wooProducts);
+                $existing = count(array_filter($wooProducts, fn($p) => $p['exists']));
+                $new = $total - $existing;
+
+                return [
+                    Forms\Components\Section::make('✅ Conexión Exitosa')
+                        ->schema([
+                            Forms\Components\Placeholder::make('stats')
+                                ->label('')
+                                ->content(new \Illuminate\Support\HtmlString(
+                                    "<div class='flex gap-4 flex-wrap'>
+                                        <span class='px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium'>📦 Total: {$total}</span>
+                                        <span class='px-3 py-1 bg-green-100 text-green-800 rounded-full font-medium'>🆕 Nuevos: {$new}</span>
+                                        <span class='px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full font-medium'>🔄 Existentes: {$existing}</span>
+                                    </div>"
+                                )),
+                        ]),
+
+                    Forms\Components\Section::make('Seleccionar Productos')
+                        ->description('Marque los productos que desea importar. El precio se asignará como costo base al primer proveedor.')
+                        ->schema([
+                            Forms\Components\CheckboxList::make('selected_products')
+                                ->label('')
+                                ->options($options)
+                                ->descriptions($descriptions)
+                                ->columns(1)
+                                ->searchable()
+                                ->bulkToggleable()
+                                ->default(array_keys($options)),
+                        ])
+                        ->collapsible(),
+                ];
             })
             ->action(function (array $data): void {
                 $selectedIds = $data['selected_products'] ?? [];
-                $productsData = json_decode($data['woo_products_data'] ?? '{}', true);
 
                 if (empty($selectedIds)) {
                     Notification::make()
@@ -202,59 +217,116 @@ class ListProducts extends ListRecords
                     return;
                 }
 
+                // Normalizar selectedIds a strings
+                $selectedIds = array_map('strval', $selectedIds);
+
+                // Re-obtener los productos de WooCommerce (usa cache si está disponible)
+                $result = self::fetchWooCommerceProducts();
+
+                if (isset($result['error']) || empty($result['products'])) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Error')
+                        ->body('No se pudieron obtener los productos de WooCommerce. Intente nuevamente.')
+                        ->send();
+                    return;
+                }
+
+                $productsData = $result['products'];
+
+                Log::info('WooCommerce Import Starting', [
+                    'selected_count' => count($selectedIds),
+                    'available_count' => count($productsData),
+                ]);
+
                 // Obtener el primer proveedor para asignar precio base
                 $firstSupplier = Supplier::first();
 
                 $count = 0;
                 $updated = 0;
+                $errors = [];
 
                 foreach ($productsData as $id => $product) {
-                    if (!in_array((string)$id, $selectedIds)) {
+                    $idStr = (string)$id;
+                    if (!in_array($idStr, $selectedIds, true)) {
                         continue;
                     }
 
-                    $exists = $product['exists'] ?? false;
-                    $isActive = ($product['status'] === 'publish' && $product['stock_status'] === 'instock');
+                    try {
+                        $exists = $product['exists'] ?? false;
+                        $isActive = (($product['status'] ?? '') === 'publish' && ($product['stock_status'] ?? 'instock') === 'instock');
 
-                    // Crear o actualizar producto
-                    $dbProduct = Product::withTrashed()->updateOrCreate(
-                        ['woocommerce_product_id' => $id],
-                        [
-                            'name' => $product['name'],
-                            'price' => $product['price'],
-                            'sku' => $product['sku'],
-                            'type' => 'digital_product',
-                            'is_active' => $isActive,
-                            'deleted_at' => null,
-                        ]
-                    );
-
-                    // Asignar precio base al primer proveedor si existe
-                    if ($firstSupplier && $product['price'] > 0) {
-                        ProductSupplierPrice::updateOrCreate(
+                        // Crear o actualizar producto
+                        $dbProduct = Product::withTrashed()->updateOrCreate(
+                            ['woocommerce_product_id' => (int)$product['id']],
                             [
-                                'product_id' => $dbProduct->id,
-                                'supplier_id' => $firstSupplier->id,
-                            ],
-                            [
-                                'base_price' => $product['price'],
+                                'name' => $product['name'] ?? 'Sin nombre',
+                                'price' => floatval($product['price'] ?? 0),
+                                'sku' => !empty($product['sku']) ? $product['sku'] : null,
+                                'type' => 'digital_product',
+                                'is_active' => $isActive,
+                                'deleted_at' => null,
                             ]
                         );
-                    }
 
-                    if ($exists) {
-                        $updated++;
-                    } else {
-                        $count++;
+                        Log::info('WooCommerce Product Saved', [
+                            'woo_id' => $product['id'],
+                            'db_id' => $dbProduct->id,
+                            'name' => $dbProduct->name,
+                            'wasRecentlyCreated' => $dbProduct->wasRecentlyCreated,
+                        ]);
+
+                        // Asignar precio base al primer proveedor si existe
+                        if ($firstSupplier && floatval($product['price'] ?? 0) > 0) {
+                            ProductSupplierPrice::updateOrCreate(
+                                [
+                                    'product_id' => $dbProduct->id,
+                                    'supplier_id' => $firstSupplier->id,
+                                ],
+                                [
+                                    'base_price' => floatval($product['price']),
+                                ]
+                            );
+                        }
+
+                        if ($exists) {
+                            $updated++;
+                        } else {
+                            $count++;
+                        }
+                    } catch (\Exception $e) {
+                        $errors[] = ($product['name'] ?? $id) . ': ' . $e->getMessage();
+                        Log::error('WooCommerce Product Import Error', [
+                            'id' => $id,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
                     }
                 }
 
-                Notification::make()
-                    ->success()
-                    ->title('✅ Importación completada')
-                    ->body("Se importaron {$count} productos nuevos y se actualizaron {$updated} existentes" .
-                        ($firstSupplier ? ". Precio base asignado a: {$firstSupplier->name}" : ""))
-                    ->send();
+                // Limpiar cache después de importar
+                self::$wooProductsCache = null;
+
+                $message = "Se importaron {$count} productos nuevos y se actualizaron {$updated} existentes";
+                if ($firstSupplier) {
+                    $message .= ". Precio base asignado a: {$firstSupplier->name}";
+                }
+
+                if (!empty($errors)) {
+                    Notification::make()
+                        ->warning()
+                        ->title('⚠️ Importación con errores')
+                        ->body($message . ". Errores: " . count($errors))
+                        ->send();
+
+                    Log::warning('WooCommerce Import completed with errors', ['errors' => $errors]);
+                } else {
+                    Notification::make()
+                        ->success()
+                        ->title('✅ Importación completada')
+                        ->body($message)
+                        ->send();
+                }
             });
     }
 
