@@ -267,6 +267,8 @@ class ListProducts extends ListRecords
                 $updated = 0;
                 $errors = [];
 
+                $savedProducts = [];
+
                 foreach ($productsData as $id => $product) {
                     $idStr = (string)$id;
                     if (!in_array($idStr, $selectedIds, true)) {
@@ -274,28 +276,47 @@ class ListProducts extends ListRecords
                     }
 
                     try {
-                        $exists = $product['exists'] ?? false;
                         $isActive = (($product['status'] ?? '') === 'publish' && ($product['stock_status'] ?? 'instock') === 'instock');
+                        $wooId = (int)$product['id'];
 
-                        // Crear o actualizar producto
-                        $dbProduct = Product::withTrashed()->updateOrCreate(
-                            ['woocommerce_product_id' => (int)$product['id']],
-                            [
-                                'name' => $product['name'] ?? 'Sin nombre',
-                                'price' => floatval($product['price'] ?? 0),
-                                'sku' => !empty($product['sku']) ? $product['sku'] : null,
-                                'type' => 'digital_product',
-                                'is_active' => $isActive,
-                                'deleted_at' => null,
-                            ]
-                        );
+                        Log::info('WooCommerce: Attempting to save product', [
+                            'woo_id' => $wooId,
+                            'name' => $product['name'] ?? 'Sin nombre',
+                            'price' => $product['price'] ?? 0,
+                        ]);
 
-                        Log::info('WooCommerce Product Saved', [
-                            'woo_id' => $product['id'],
+                        // Crear o actualizar producto - usar firstOrNew + save para mejor control
+                        $dbProduct = Product::withTrashed()
+                            ->where('woocommerce_product_id', $wooId)
+                            ->first();
+
+                        $isNew = !$dbProduct;
+
+                        if (!$dbProduct) {
+                            $dbProduct = new Product();
+                            $dbProduct->woocommerce_product_id = $wooId;
+                        }
+
+                        $dbProduct->name = $product['name'] ?? 'Sin nombre';
+                        $dbProduct->price = floatval($product['price'] ?? 0);
+                        $dbProduct->sku = !empty($product['sku']) ? $product['sku'] : null;
+                        $dbProduct->type = 'digital_product';
+                        $dbProduct->is_active = $isActive;
+                        $dbProduct->deleted_at = null;
+                        $dbProduct->save();
+
+                        Log::info('WooCommerce Product Saved Successfully', [
+                            'woo_id' => $wooId,
                             'db_id' => $dbProduct->id,
                             'name' => $dbProduct->name,
-                            'wasRecentlyCreated' => $dbProduct->wasRecentlyCreated,
+                            'is_new' => $isNew,
                         ]);
+
+                        $savedProducts[] = [
+                            'id' => $dbProduct->id,
+                            'name' => $dbProduct->name,
+                            'is_new' => $isNew,
+                        ];
 
                         // Asignar precio base al primer proveedor si existe
                         if ($firstSupplier && floatval($product['price'] ?? 0) > 0) {
@@ -310,10 +331,10 @@ class ListProducts extends ListRecords
                             );
                         }
 
-                        if ($exists) {
-                            $updated++;
-                        } else {
+                        if ($isNew) {
                             $count++;
+                        } else {
+                            $updated++;
                         }
                     } catch (\Exception $e) {
                         $errors[] = ($product['name'] ?? $id) . ': ' . $e->getMessage();
@@ -328,30 +349,49 @@ class ListProducts extends ListRecords
                 // Limpiar sesión después de importar
                 Session::forget('woo_products_data');
 
+                // Verificar cuántos productos WooCommerce hay realmente en la BD
+                $totalWooProducts = Product::whereNotNull('woocommerce_product_id')->count();
+
                 Log::info('WooCommerce Import Completed', [
                     'new_count' => $count,
                     'updated_count' => $updated,
                     'errors_count' => count($errors),
+                    'saved_products' => $savedProducts,
+                    'total_woo_products_in_db' => $totalWooProducts,
                 ]);
 
-                $message = "Se importaron {$count} productos nuevos y se actualizaron {$updated} existentes";
-                if ($firstSupplier) {
-                    $message .= ". Precio base asignado a: {$firstSupplier->name}";
+                $message = "Se guardaron {$count} productos nuevos y se actualizaron {$updated} existentes.";
+                if (!empty($savedProducts)) {
+                    $names = array_slice(array_column($savedProducts, 'name'), 0, 3);
+                    $message .= " Productos: " . implode(', ', $names);
+                    if (count($savedProducts) > 3) {
+                        $message .= "...";
+                    }
                 }
+                $message .= " (Total WooCommerce en BD: {$totalWooProducts})";
 
                 if (!empty($errors)) {
                     Notification::make()
                         ->warning()
                         ->title('⚠️ Importación con errores')
                         ->body($message . ". Errores: " . count($errors))
+                        ->persistent()
                         ->send();
 
                     Log::warning('WooCommerce Import completed with errors', ['errors' => $errors]);
-                } else {
+                } else if ($count > 0 || $updated > 0) {
                     Notification::make()
                         ->success()
                         ->title('✅ Importación completada')
                         ->body($message)
+                        ->persistent()
+                        ->send();
+                } else {
+                    Notification::make()
+                        ->warning()
+                        ->title('⚠️ Sin cambios')
+                        ->body('No se guardó ningún producto. Verifique la selección.')
+                        ->persistent()
                         ->send();
                 }
             });

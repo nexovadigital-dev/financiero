@@ -144,6 +144,7 @@ class ExpenseResource extends Resource
                                     ->minValue(0)
                                     ->step(0.01)
                                     ->placeholder('0.00')
+                                    ->live(onBlur: true)
                                     ->helperText('💳 Créditos que se sumarán al balance del proveedor'),
                             ]),
 
