@@ -175,11 +175,19 @@ class ProductResource extends Resource
                     ->weight('bold')
                     ->limit(50),
 
-                Tables\Columns\TextColumn::make('base_price')
-                    ->label('Precio Base')
-                    ->money('USD')
-                    ->sortable()
-                    ->default('0.00'),
+                // Indicador de precios pendientes
+                Tables\Columns\TextColumn::make('supplierPrices')
+                    ->label('Precios Base')
+                    ->badge()
+                    ->color(fn ($record) => $record->supplierPrices->count() > 0 ? 'success' : 'danger')
+                    ->formatStateUsing(fn ($record) => $record->supplierPrices->count() > 0
+                        ? '✓ ' . $record->supplierPrices->count() . ' proveedor(es)'
+                        : '⚠️ Sin configurar'
+                    )
+                    ->tooltip(fn ($record) => $record->supplierPrices->count() > 0
+                        ? $record->supplierPrices->map(fn($p) => $p->supplier?->name . ': $' . number_format($p->base_price, 2))->join(', ')
+                        : 'Este producto no tiene precios base configurados. Haga clic para configurar.'
+                    ),
 
                 Tables\Columns\TextColumn::make('type')
                     ->label('Tipo')
@@ -201,6 +209,7 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('sku')
                     ->label('SKU')
                     ->searchable()
+                    ->toggleable()
                     ->color('gray'),
 
                 Tables\Columns\IconColumn::make('is_active')
@@ -230,8 +239,22 @@ class ProductResource extends Resource
                     ])
                     ->native(false)
                     ->placeholder('Todos los tipos'),
+
+                // Filtro para productos sin precios configurados
+                Tables\Filters\Filter::make('sin_precios')
+                    ->label('⚠️ Sin precios configurados')
+                    ->query(fn ($query) => $query->whereDoesntHave('supplierPrices'))
+                    ->toggle(),
             ])
             ->actions([
+                // Acción rápida para configurar precios
+                Tables\Actions\Action::make('configurar_precios')
+                    ->label('Configurar')
+                    ->icon('heroicon-o-currency-dollar')
+                    ->color('warning')
+                    ->visible(fn ($record) => $record->supplierPrices->count() === 0)
+                    ->url(fn ($record) => static::getUrl('edit', ['record' => $record])),
+
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make()
                     ->requiresConfirmation()
