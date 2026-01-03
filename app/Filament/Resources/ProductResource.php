@@ -128,7 +128,8 @@ class ProductResource extends Resource
                                             ->required()
                                             ->distinct()
                                             ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                            ->searchable(),
+                                            ->native(false)
+                                            ->preload(),
 
                                         Forms\Components\TextInput::make('base_price')
                                             ->label('Precio Base (USD)')

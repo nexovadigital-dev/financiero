@@ -12,6 +12,7 @@ class SaleItem extends Model
     protected $fillable = [
         'sale_id',
         'product_id',
+        'product_name', // Nombre guardado para historial aunque se elimine el producto
         'quantity',
         'unit_price',
         'base_price',
@@ -19,6 +20,14 @@ class SaleItem extends Model
         'total_price',
         'metadata_values',
     ];
+
+    /**
+     * Obtener el nombre del producto (usar product_name guardado o fallback a relación)
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        return $this->product_name ?? $this->product?->name ?? 'Producto eliminado';
+    }
 
     protected $casts = [
         'metadata_values' => 'array',

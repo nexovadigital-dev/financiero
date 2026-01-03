@@ -4,6 +4,7 @@ namespace App\Filament\Resources\SaleResource\Pages;
 
 use App\Filament\Resources\SaleResource;
 use App\Models\PaymentMethod;
+use App\Models\Product;
 use App\Models\Supplier;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
@@ -19,10 +20,20 @@ class CreateSale extends CreateRecord
     }
 
     /**
-     * Validar antes de crear que el proveedor tenga balance suficiente
+     * Validar y mutar datos antes de crear
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        // Agregar product_name a cada item para histórico
+        if (isset($data['items']) && is_array($data['items'])) {
+            foreach ($data['items'] as $key => $item) {
+                if (!empty($item['product_id'])) {
+                    $product = Product::find($item['product_id']);
+                    $data['items'][$key]['product_name'] = $product?->name ?? 'Producto desconocido';
+                }
+            }
+        }
+
         // Verificar si es una venta con créditos de servidor
         if (!isset($data['payment_method_id']) || empty($data['supplier_id'])) {
             return $data;

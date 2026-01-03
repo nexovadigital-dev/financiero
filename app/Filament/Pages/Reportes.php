@@ -251,12 +251,17 @@ class Reportes extends Page implements HasForms, HasTable
                     ->limit(25)
                     ->tooltip(fn ($record) => $record->client?->name),
 
-                Tables\Columns\TextColumn::make('items.product.name')
+                Tables\Columns\TextColumn::make('items')
                     ->label('Productos')
-                    ->listWithLineBreaks()
-                    ->limitList(2)
-                    ->expandableLimitedList()
-                    ->bulleted(),
+                    ->formatStateUsing(fn ($record) => $record->items
+                        ->map(fn ($item) => $item->product_name ?? $item->product?->name ?? 'Producto eliminado')
+                        ->join(', ')
+                    )
+                    ->limit(50)
+                    ->tooltip(fn ($record) => $record->items
+                        ->map(fn ($item) => ($item->product_name ?? $item->product?->name ?? 'Eliminado') . ' x' . $item->quantity)
+                        ->join("\n")
+                    ),
 
                 Tables\Columns\TextColumn::make('source')
                     ->label('Origen')
