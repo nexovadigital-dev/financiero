@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\PricePackage;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -120,7 +121,7 @@ class ProductResource extends Resource
                             ->relationship()
                             ->label('Precios por Proveedor')
                             ->schema([
-                                Forms\Components\Grid::make(2)
+                                Forms\Components\Grid::make(3)
                                     ->schema([
                                         Forms\Components\Select::make('supplier_id')
                                             ->label('Proveedor')
@@ -129,7 +130,8 @@ class ProductResource extends Resource
                                             ->distinct()
                                             ->disableOptionsWhenSelectedInSiblingRepeaterItems()
                                             ->native(false)
-                                            ->preload(),
+                                            ->preload()
+                                            ->live(),
 
                                         Forms\Components\TextInput::make('base_price')
                                             ->label('Precio Base (USD)')
@@ -139,15 +141,35 @@ class ProductResource extends Resource
                                             ->minValue(0)
                                             ->step(0.01)
                                             ->required()
-                                            ->helperText('Costo de este producto con este proveedor'),
+                                            ->helperText('Costo en créditos USD'),
+
+                                        Forms\Components\TextInput::make('base_price_nio')
+                                            ->label('Precio Base (NIO)')
+                                            ->numeric()
+                                            ->prefix('C$')
+                                            ->default(null)
+                                            ->minValue(0)
+                                            ->step(0.01)
+                                            ->helperText('Para reportes al banco')
+                                            ->visible(function (Get $get) {
+                                                $supplierId = $get('supplier_id');
+                                                if (!$supplierId) return false;
+                                                $supplier = \App\Models\Supplier::find($supplierId);
+                                                return $supplier && $supplier->payment_currency === 'LOCAL';
+                                            }),
                                     ]),
                             ])
                             ->defaultItems(0)
                             ->addActionLabel('+ Agregar Proveedor')
                             ->collapsible()
-                            ->itemLabel(fn (array $state): ?string =>
-                                \App\Models\Supplier::find($state['supplier_id'])?->name . ' - $' . number_format($state['base_price'] ?? 0, 2)
-                            )
+                            ->itemLabel(function (array $state): ?string {
+                                $supplier = \App\Models\Supplier::find($state['supplier_id']);
+                                $label = $supplier?->name . ' - $' . number_format($state['base_price'] ?? 0, 2) . ' USD';
+                                if ($supplier?->payment_currency === 'LOCAL' && ($state['base_price_nio'] ?? 0) > 0) {
+                                    $label .= ' / C$' . number_format($state['base_price_nio'], 2) . ' NIO';
+                                }
+                                return $label;
+                            })
                             ->columnSpanFull(),
 
                         Forms\Components\Placeholder::make('supplier_prices_note')

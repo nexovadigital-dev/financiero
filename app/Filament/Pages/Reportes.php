@@ -262,8 +262,34 @@ class Reportes extends Page implements HasForms, HasTable
         }
         $cantidadGastos = $gastosQuery->count();
 
-        // 4. BALANCE/GANANCIA NETA
+        // 4. COSTO DE VENTAS (Débito del proveedor)
+        $costoVentasQuery = Sale::query()
+            ->where('status', 'completed')
+            ->whereNull('refunded_at')
+            ->whereDate('sale_date', '>=', $startDate)
+            ->whereDate('sale_date', '<=', $endDate)
+            ->with('items');
+
+        if ($currency !== 'ALL') {
+            $costoVentasQuery->where('currency', $currency);
+        }
+
+        $costoVentas = $costoVentasQuery->get()->sum(function ($sale) use ($currency) {
+            return $sale->items->sum(function ($item) use ($currency) {
+                // Si moneda es NIO y hay base_price_nio, usar ese para el reporte
+                if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                    return $item->base_price_nio * $item->quantity;
+                }
+                // De lo contrario, usar base_price (USD)
+                return ($item->base_price ?? 0) * $item->quantity;
+            });
+        });
+
+        // 5. BALANCE/GANANCIA NETA
         $balanceNeto = $totalIngresos - $totalGastos;
+
+        // 6. GANANCIA BRUTA = Ingresos - Costo de Ventas
+        $gananciaBruta = $totalIngresos - $costoVentas;
 
         // Total de ventas (todas)
         $totalVentasQuery = clone $baseQuery;
@@ -276,6 +302,8 @@ class Reportes extends Page implements HasForms, HasTable
             'egresos_count' => $cantidadVentasCreditos,
             'gastos' => $totalGastos,
             'gastos_count' => $cantidadGastos,
+            'costo_ventas' => $costoVentas,
+            'ganancia_bruta' => $gananciaBruta,
             'balance_neto' => $balanceNeto,
             'total_ventas' => $totalVentas,
         ];
@@ -405,11 +433,25 @@ class Reportes extends Page implements HasForms, HasTable
                             'USDT' => '$',
                             default => $currency . ' ',
                         };
-                        $cost = $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity);
+                        // Si es NIO, usar base_price_nio si está disponible
+                        $cost = $record->items->sum(function ($item) use ($currency) {
+                            if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                                return $item->base_price_nio * $item->quantity;
+                            }
+                            return ($item->base_price ?? 0) * $item->quantity;
+                        });
                         return $symbol . number_format($cost, 2) . ' ' . $currency;
                     })
                     ->color('warning')
-                    ->getStateUsing(fn ($record) => $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity)),
+                    ->getStateUsing(function ($record) {
+                        $currency = $record->currency ?? 'USD';
+                        return $record->items->sum(function ($item) use ($currency) {
+                            if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                                return $item->base_price_nio * $item->quantity;
+                            }
+                            return ($item->base_price ?? 0) * $item->quantity;
+                        });
+                    }),
 
                 Tables\Columns\TextColumn::make('profit')
                     ->label('Ganancia')
@@ -422,15 +464,27 @@ class Reportes extends Page implements HasForms, HasTable
                             default => $currency . ' ',
                         };
                         $total = $record->total_amount;
-                        $cost = $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity);
+                        // Si es NIO, usar base_price_nio si está disponible
+                        $cost = $record->items->sum(function ($item) use ($currency) {
+                            if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                                return $item->base_price_nio * $item->quantity;
+                            }
+                            return ($item->base_price ?? 0) * $item->quantity;
+                        });
                         $profit = $total - $cost;
                         return $symbol . number_format($profit, 2) . ' ' . $currency;
                     })
                     ->weight('bold')
                     ->color('success')
                     ->getStateUsing(function ($record) {
+                        $currency = $record->currency ?? 'USD';
                         $total = $record->total_amount;
-                        $cost = $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity);
+                        $cost = $record->items->sum(function ($item) use ($currency) {
+                            if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                                return $item->base_price_nio * $item->quantity;
+                            }
+                            return ($item->base_price ?? 0) * $item->quantity;
+                        });
                         return $total - $cost;
                     }),
 

@@ -16,6 +16,7 @@ class SaleItem extends Model
         'quantity',
         'unit_price',
         'base_price',
+        'base_price_nio', // Precio en NIO para reportes al banco (solo proveedor Moneda Local)
         'package_price',
         'total_price',
         'metadata_values',
@@ -33,6 +34,7 @@ class SaleItem extends Model
         'metadata_values' => 'array',
         'unit_price' => 'decimal:2',
         'base_price' => 'decimal:2',
+        'base_price_nio' => 'decimal:2',
         'package_price' => 'decimal:2',
         'total_price' => 'decimal:2',
     ];

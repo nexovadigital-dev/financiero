@@ -97,7 +97,11 @@ class SaleResource extends Resource
                                         : 'Vincular esta venta con un proveedor para contabilidad interna.')
                                     ->required(fn (Get $get) => self::isServerCreditsPayment($get('payment_method_id')) && !$get('without_supplier'))
                                     ->visible(fn (Get $get) => !$get('without_supplier'))
-                                    ->live(),
+                                    ->live()
+                                    ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                                        // Cuando cambie el proveedor, recalcular los precios base de todos los items
+                                        self::recalculateItemPrices($get, $set, $state);
+                                    }),
 
                                 // Mostrar balance disponible del proveedor
                                 Forms\Components\Placeholder::make('supplier_balance_info')
@@ -302,7 +306,7 @@ class SaleResource extends Resource
                             ->label('Productos de la Venta')
                             ->helperText('⚠️ Debe agregar al menos un producto a la venta')
                             ->schema([
-                                Forms\Components\Grid::make(4)
+                                Forms\Components\Grid::make(5)
                                     ->schema([
                                         Forms\Components\Select::make('product_id')
                                             ->label('Producto')
@@ -313,8 +317,9 @@ class SaleResource extends Resource
                                                 // 1. Busca el producto
                                                 $product = Product::find($state);
                                                 if ($product) {
-                                                    // 2. Obtener el paquete de precios seleccionado
+                                                    // 2. Obtener el paquete de precios y proveedor seleccionados
                                                     $packageId = $get('../../price_package_id');
+                                                    $supplierId = $get('../../supplier_id');
 
                                                     // 3. Determinar el precio según el paquete
                                                     $packagePrice = null;
@@ -336,12 +341,17 @@ class SaleResource extends Resource
                                                         $packagePrice = $product->price;
                                                     }
 
-                                                    // 4. Guardar precios
-                                                    $set('base_price', $product->base_price ?? 0); // Precio que se debita del proveedor
+                                                    // 4. Obtener precio base según el PROVEEDOR seleccionado
+                                                    $basePrice = $product->getBasePriceForSupplier($supplierId);
+                                                    $basePriceNio = $product->getBasePriceNioForSupplier($supplierId);
+
+                                                    // 5. Guardar precios
+                                                    $set('base_price', $basePrice); // Precio que se debita del proveedor (USD)
+                                                    $set('base_price_nio', $basePriceNio); // Precio en NIO para reportes
                                                     $set('package_price', $packagePrice); // Precio que se cobra al cliente
                                                     $set('unit_price', $packagePrice); // Para compatibilidad
 
-                                                    // 5. Calcula subtotal (Precio del paquete x Cantidad)
+                                                    // 6. Calcula subtotal (Precio del paquete x Cantidad)
                                                     $qty = $get('quantity') ?? 1;
                                                     $set('total_price', $packagePrice * $qty);
                                                 }
@@ -386,10 +396,35 @@ class SaleResource extends Resource
                                             })
                                             ->columnSpan(1),
                                             
+                                        // Mostrar precio base del proveedor
+                                        Forms\Components\Placeholder::make('base_price_info')
+                                            ->label('Costo Proveedor')
+                                            ->content(function (Get $get) {
+                                                $basePrice = floatval($get('base_price') ?? 0);
+                                                $basePriceNio = $get('base_price_nio');
+                                                $supplierId = $get('../../supplier_id');
+
+                                                if ($basePrice <= 0) {
+                                                    return '-';
+                                                }
+
+                                                $html = '<span style="color: #f97316; font-weight: 600;">$' . number_format($basePrice, 2) . ' USD</span>';
+
+                                                // Si es proveedor Moneda Local y tiene precio NIO
+                                                if ($basePriceNio && $basePriceNio > 0) {
+                                                    $html .= '<br><span style="color: #3b82f6; font-size: 0.85em;">C$ ' . number_format($basePriceNio, 2) . ' NIO</span>';
+                                                }
+
+                                                return new \Illuminate\Support\HtmlString($html);
+                                            })
+                                            ->columnSpan(1),
+
                                         // Campos ocultos para guardar precios
                                         Forms\Components\Hidden::make('total_price')
                                             ->dehydrated(),
                                         Forms\Components\Hidden::make('base_price')
+                                            ->dehydrated(),
+                                        Forms\Components\Hidden::make('base_price_nio')
                                             ->dehydrated(),
                                         Forms\Components\Hidden::make('package_price')
                                             ->dehydrated(),
@@ -615,5 +650,50 @@ class SaleResource extends Resource
 
         $paymentMethod = \App\Models\PaymentMethod::find($paymentMethodId);
         return $paymentMethod && $paymentMethod->name === 'Créditos Servidor';
+    }
+
+    /**
+     * Recalcular los precios base de todos los items cuando cambia el proveedor
+     */
+    public static function recalculateItemPrices(Get $get, Set $set, $supplierId): void
+    {
+        $items = $get('items');
+
+        if (!$items || !is_array($items)) {
+            return;
+        }
+
+        $updatedItems = [];
+        foreach ($items as $key => $item) {
+            $productId = $item['product_id'] ?? null;
+
+            if ($productId) {
+                $product = Product::find($productId);
+                if ($product) {
+                    // Obtener precio base según el nuevo proveedor
+                    $basePrice = $product->getBasePriceForSupplier($supplierId);
+                    $basePriceNio = $product->getBasePriceNioForSupplier($supplierId);
+
+                    $item['base_price'] = $basePrice;
+                    $item['base_price_nio'] = $basePriceNio;
+                }
+            }
+
+            $updatedItems[$key] = $item;
+        }
+
+        $set('items', $updatedItems);
+
+        // Notificar al usuario
+        if ($supplierId) {
+            $supplier = \App\Models\Supplier::find($supplierId);
+            if ($supplier) {
+                \Filament\Notifications\Notification::make()
+                    ->info()
+                    ->title('Precios actualizados')
+                    ->body("Los precios base se han actualizado según el proveedor: {$supplier->name}")
+                    ->send();
+            }
+        }
     }
 }

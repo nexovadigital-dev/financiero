@@ -83,7 +83,7 @@ class Product extends Model
     }
 
     /**
-     * Obtener el precio base para un proveedor específico
+     * Obtener el precio base para un proveedor específico (siempre en USD)
      */
     public function getBasePriceForSupplier(?int $supplierId): float
     {
@@ -97,6 +97,23 @@ class Product extends Model
             ->first();
 
         return $supplierPrice?->base_price ?? $this->base_price ?? 0;
+    }
+
+    /**
+     * Obtener el precio base en NIO para un proveedor específico
+     * Solo aplica para el proveedor "Moneda Local"
+     */
+    public function getBasePriceNioForSupplier(?int $supplierId): ?float
+    {
+        if (!$supplierId) {
+            return null;
+        }
+
+        $supplierPrice = $this->supplierPrices()
+            ->where('supplier_id', $supplierId)
+            ->first();
+
+        return $supplierPrice?->base_price_nio;
     }
 
     /**

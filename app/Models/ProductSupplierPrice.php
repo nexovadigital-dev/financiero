@@ -11,10 +11,12 @@ class ProductSupplierPrice extends Model
         'product_id',
         'supplier_id',
         'base_price',
+        'base_price_nio', // Precio en córdobas para reportes al banco (solo Moneda Local)
     ];
 
     protected $casts = [
         'base_price' => 'decimal:2',
+        'base_price_nio' => 'decimal:2',
     ];
 
     /**
