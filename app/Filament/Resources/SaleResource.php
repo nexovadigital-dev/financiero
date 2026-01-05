@@ -229,7 +229,15 @@ class SaleResource extends Resource
 
                                 Forms\Components\TextInput::make('total_amount')
                                     ->label('TOTAL A PAGAR')
-                                    ->prefix('$')
+                                    ->prefix(function (Get $get) {
+                                        $currency = $get('currency');
+                                        return match($currency) {
+                                            'NIO' => 'C$',
+                                            'USD' => '$',
+                                            'USDT' => '$',
+                                            default => '$',
+                                        };
+                                    })
                                     ->numeric()
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function (Get $get, Set $set, $state) {
@@ -495,7 +503,16 @@ class SaleResource extends Resource
 
                 Tables\Columns\TextColumn::make('total_amount')
                     ->label('Total')
-                    ->money('USD')
+                    ->formatStateUsing(function ($record) {
+                        $currency = $record->currency ?? 'USD';
+                        $symbol = match($currency) {
+                            'NIO' => 'C$',
+                            'USD' => '$',
+                            'USDT' => '$',
+                            default => '$',
+                        };
+                        return $symbol . number_format($record->total_amount, 2) . ' ' . $currency;
+                    })
                     ->weight('bold')
                     ->sortable(),
 
