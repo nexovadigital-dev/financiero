@@ -2,9 +2,9 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\IngresosChart;
-use App\Filament\Widgets\MetodosPagoChart;
 use App\Models\Currency;
+use App\Models\Expense;
+use App\Models\PaymentMethod;
 use App\Models\Sale;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -28,7 +28,7 @@ class Reportes extends Page implements HasForms, HasTable
 
     protected static ?string $navigationLabel = 'Reportes Financieros';
 
-    protected static ?string $title = 'Reportes Financieros Avanzados';
+    protected static ?string $title = 'Reportes Financieros';
 
     protected static ?string $navigationGroup = 'Gestión';
 
@@ -48,7 +48,7 @@ class Reportes extends Page implements HasForms, HasTable
 
     public function mount(): void
     {
-        $this->activeTab = 'ALL'; // Por defecto mostrar TODAS las ventas
+        $this->activeTab = 'ALL';
         $this->filters['currency'] = 'ALL';
         $this->filters['start_date'] = now()->startOfMonth();
         $this->filters['end_date'] = now()->endOfDay();
@@ -57,6 +57,7 @@ class Reportes extends Page implements HasForms, HasTable
     public function updatedActiveTab($value): void
     {
         $this->filters['currency'] = $value;
+        $this->resetTable();
     }
 
     // Método para aplicar filtros manualmente
@@ -187,11 +188,96 @@ class Reportes extends Page implements HasForms, HasTable
             ->statePath('filters');
     }
 
-    protected function getHeaderWidgets(): array
+    /**
+     * Obtener estadísticas financieras completas
+     * - Ingresos: ventas con métodos de pago que NO sean "Créditos Servidor"
+     * - Egresos por Créditos: ventas con método "Créditos Servidor" (debitan del proveedor)
+     * - Gastos/Inversiones: pagos a proveedores (tabla expenses)
+     */
+    public function getFinancialStats(): array
     {
+        $startDate = $this->parseDate($this->filters['start_date']) ?? now()->startOfMonth()->format('Y-m-d');
+        $endDate = $this->parseDate($this->filters['end_date']) ?? now()->format('Y-m-d');
+        $currency = $this->activeTab;
+
+        // Obtener el ID del método de pago "Créditos Servidor"
+        $creditosServidor = PaymentMethod::where('name', 'Créditos Servidor')->first();
+        $creditosServidorId = $creditosServidor?->id;
+
+        // Query base para ventas
+        $baseQuery = Sale::query()
+            ->where('status', 'completed')
+            ->whereNull('refunded_at')
+            ->whereDate('sale_date', '>=', $startDate)
+            ->whereDate('sale_date', '<=', $endDate);
+
+        // Aplicar filtro de moneda si no es "ALL"
+        if ($currency !== 'ALL') {
+            $baseQuery->where('currency', $currency);
+        }
+
+        // 1. INGRESOS REALES: Ventas SIN método "Créditos Servidor"
+        $ingresosQuery = clone $baseQuery;
+        if ($creditosServidorId) {
+            $ingresosQuery->where('payment_method_id', '!=', $creditosServidorId);
+        }
+
+        if ($currency === 'ALL') {
+            $totalIngresos = $ingresosQuery->sum('amount_usd');
+        } else {
+            $totalIngresos = $ingresosQuery->sum('total_amount');
+        }
+        $cantidadVentasIngresos = $ingresosQuery->count();
+
+        // 2. EGRESOS POR CRÉDITOS: Ventas CON método "Créditos Servidor"
+        $egresosQuery = clone $baseQuery;
+        $totalEgresos = 0;
+        $cantidadVentasCreditos = 0;
+
+        if ($creditosServidorId) {
+            $egresosQuery->where('payment_method_id', $creditosServidorId);
+            if ($currency === 'ALL') {
+                $totalEgresos = $egresosQuery->sum('amount_usd');
+            } else {
+                $totalEgresos = $egresosQuery->sum('total_amount');
+            }
+            $cantidadVentasCreditos = $egresosQuery->count();
+        }
+
+        // 3. GASTOS/INVERSIONES: Pagos a proveedores
+        $gastosQuery = Expense::query()
+            ->whereDate('payment_date', '>=', $startDate)
+            ->whereDate('payment_date', '<=', $endDate);
+
+        // Para gastos, filtrar por moneda del proveedor si aplica
+        if ($currency !== 'ALL') {
+            $gastosQuery->where('currency', $currency);
+            $totalGastos = $gastosQuery->sum('amount');
+        } else {
+            // Si es ALL, sumar en USD equivalente
+            $totalGastos = Expense::query()
+                ->whereDate('payment_date', '>=', $startDate)
+                ->whereDate('payment_date', '<=', $endDate)
+                ->sum('amount_usd');
+        }
+        $cantidadGastos = $gastosQuery->count();
+
+        // 4. BALANCE/GANANCIA NETA
+        $balanceNeto = $totalIngresos - $totalGastos;
+
+        // Total de ventas (todas)
+        $totalVentasQuery = clone $baseQuery;
+        $totalVentas = $totalVentasQuery->count();
+
         return [
-            IngresosChart::class,
-            MetodosPagoChart::class,
+            'ingresos' => $totalIngresos,
+            'ingresos_count' => $cantidadVentasIngresos,
+            'egresos_creditos' => $totalEgresos,
+            'egresos_count' => $cantidadVentasCreditos,
+            'gastos' => $totalGastos,
+            'gastos_count' => $cantidadGastos,
+            'balance_neto' => $balanceNeto,
+            'total_ventas' => $totalVentas,
         ];
     }
 

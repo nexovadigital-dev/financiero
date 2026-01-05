@@ -1,23 +1,15 @@
 <x-filament-panels::page>
     {{-- 1. FILTROS --}}
-    <div class="relative">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-6">
         <x-filament-panels::form>
             {{ $this->form }}
         </x-filament-panels::form>
     </div>
 
-    {{-- 2. WIDGETS DE ESTADÍSTICAS --}}
-    <div class="mb-6">
-        <x-filament-widgets::widgets
-            :widgets="$this->getHeaderWidgets()"
-            :columns="$this->getHeaderWidgetsColumns()"
-        />
-    </div>
-
-    {{-- 3. TABS DE MONEDA Y ESTADÍSTICAS --}}
+    {{-- 2. SELECTOR DE MONEDA --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-6">
-        {{-- Tabs de Moneda --}}
-        <div class="flex flex-wrap justify-center gap-2 mb-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4 text-center">Filtrar por Moneda</h3>
+        <div class="flex flex-wrap justify-center gap-2">
             @foreach($this->getActiveCurrencies() as $code => $name)
                 @php
                     $stats = $this->getStatsForCurrency($code);
@@ -42,87 +34,122 @@
                 </button>
             @endforeach
         </div>
+    </div>
 
-        {{-- Estadísticas de la moneda seleccionada --}}
-        @php
-            $currentStats = $this->getStatsForCurrency($activeTab);
-            $currencySymbol = $activeTab === 'ALL' ? '$' : $this->getCurrencySymbol($activeTab);
-        @endphp
+    {{-- 3. INDICADORES FINANCIEROS --}}
+    @php
+        $financialStats = $this->getFinancialStats();
+        $currencySymbol = $activeTab === 'ALL' ? '$' : $this->getCurrencySymbol($activeTab);
+        $currencyLabel = $activeTab === 'ALL' ? 'USD' : $activeTab;
+    @endphp
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {{-- Total Ingresos --}}
-            <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-green-600 dark:text-green-400">
-                            Total Ingresos
-                            @if($activeTab === 'ALL')
-                                <span class="text-xs opacity-75">(USD eq.)</span>
-                            @else
-                                <span class="text-xs opacity-75">({{ $activeTab }})</span>
-                            @endif
-                        </p>
-                        <p class="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-300 mt-1">
-                            {{ $currencySymbol }}{{ number_format($currentStats['total_ingresos'], 2) }}
-                        </p>
-                    </div>
-                    <div class="text-green-500 dark:text-green-400">
-                        <svg class="w-10 h-10 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {{-- INGRESOS (Ventas sin créditos) --}}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-20 h-20 bg-green-500/10 rounded-full -mr-10 -mt-10"></div>
+            <div class="relative">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                        <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                     </div>
+                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Ingresos</span>
                 </div>
-            </div>
-
-            {{-- Cantidad de Ventas --}}
-            <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-blue-600 dark:text-blue-400">Cantidad de Ventas</p>
-                        <p class="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-300 mt-1">
-                            {{ $currentStats['total_ventas'] }}
-                        </p>
-                    </div>
-                    <div class="text-blue-500 dark:text-blue-400">
-                        <svg class="w-10 h-10 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Promedio por Venta --}}
-            <div class="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-purple-600 dark:text-purple-400">
-                            Promedio/Venta
-                            @if($activeTab === 'ALL')
-                                <span class="text-xs opacity-75">(USD)</span>
-                            @endif
-                        </p>
-                        <p class="text-2xl sm:text-3xl font-bold text-purple-700 dark:text-purple-300 mt-1">
-                            {{ $currencySymbol }}{{ number_format($currentStats['promedio_venta'], 2) }}
-                        </p>
-                    </div>
-                    <div class="text-purple-500 dark:text-purple-400">
-                        <svg class="w-10 h-10 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
-                        </svg>
-                    </div>
-                </div>
+                <p class="text-2xl font-bold text-green-600 dark:text-green-400">
+                    {{ $currencySymbol }}{{ number_format($financialStats['ingresos'], 2) }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {{ $financialStats['ingresos_count'] }} ventas ({{ $currencyLabel }})
+                </p>
             </div>
         </div>
 
-        @if($activeTab === 'ALL')
-            <div class="mt-4 text-center text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg py-2 px-4">
-                💡 <strong>Vista global:</strong> Mostrando todas las ventas. Totales en USD equivalente.
+        {{-- EGRESOS POR CRÉDITOS --}}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-20 h-20 bg-orange-500/10 rounded-full -mr-10 -mt-10"></div>
+            <div class="relative">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                        <svg class="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                        </svg>
+                    </div>
+                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Uso de Créditos</span>
+                </div>
+                <p class="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                    {{ $currencySymbol }}{{ number_format($financialStats['egresos_creditos'], 2) }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {{ $financialStats['egresos_count'] }} operaciones
+                </p>
             </div>
-        @endif
+        </div>
+
+        {{-- GASTOS/INVERSIONES --}}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-20 h-20 bg-red-500/10 rounded-full -mr-10 -mt-10"></div>
+            <div class="relative">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                        <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                        </svg>
+                    </div>
+                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Gastos/Inversiones</span>
+                </div>
+                <p class="text-2xl font-bold text-red-600 dark:text-red-400">
+                    {{ $currencySymbol }}{{ number_format($financialStats['gastos'], 2) }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {{ $financialStats['gastos_count'] }} pagos a proveedores
+                </p>
+            </div>
+        </div>
+
+        {{-- BALANCE NETO --}}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-20 h-20 {{ $financialStats['balance_neto'] >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10' }} rounded-full -mr-10 -mt-10"></div>
+            <div class="relative">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="p-2 {{ $financialStats['balance_neto'] >= 0 ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-red-100 dark:bg-red-900/30' }} rounded-lg">
+                        <svg class="w-5 h-5 {{ $financialStats['balance_neto'] >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Balance Neto</span>
+                </div>
+                <p class="text-2xl font-bold {{ $financialStats['balance_neto'] >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400' }}">
+                    {{ $financialStats['balance_neto'] >= 0 ? '' : '-' }}{{ $currencySymbol }}{{ number_format(abs($financialStats['balance_neto']), 2) }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Ingresos - Gastos
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {{-- RESUMEN ADICIONAL --}}
+    <div class="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-4 mb-6 border border-gray-200 dark:border-gray-600">
+        <div class="flex flex-wrap justify-center gap-6 text-sm">
+            <div class="text-center">
+                <span class="text-gray-500 dark:text-gray-400">Total Ventas:</span>
+                <span class="font-bold text-gray-900 dark:text-white ml-1">{{ $financialStats['total_ventas'] }}</span>
+            </div>
+            <div class="text-center">
+                <span class="text-gray-500 dark:text-gray-400">Moneda:</span>
+                <span class="font-bold text-gray-900 dark:text-white ml-1">{{ $activeTab === 'ALL' ? 'Todas (USD eq.)' : $activeTab }}</span>
+            </div>
+            @if($activeTab === 'ALL')
+                <div class="text-center text-xs text-gray-400">
+                    💡 Los valores en "TODAS" se muestran en USD equivalente para comparación
+                </div>
+            @endif
+        </div>
     </div>
 
     {{-- 4. TABLA DE VENTAS --}}
-    <div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         {{ $this->table }}
     </div>
 </x-filament-panels::page>
