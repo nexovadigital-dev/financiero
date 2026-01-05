@@ -65,11 +65,44 @@ class SaleResource extends Resource
 
                                 Forms\Components\Select::make('price_package_id')
                                     ->label('📦 Paquete de Precios')
-                                    ->options(PricePackage::active()->ordered()->pluck('name', 'id'))
+                                    ->options(function () {
+                                        return PricePackage::active()->ordered()->get()->mapWithKeys(function ($package) {
+                                            $symbol = $package->currency === 'NIO' ? 'C$' : '$';
+                                            $label = $package->name . ' (' . $symbol . ' ' . $package->currency . ')';
+                                            return [$package->id => $label];
+                                        });
+                                    })
                                     ->default(fn () => PricePackage::active()->ordered()->first()?->id)
                                     ->required()
                                     ->live()
-                                    ->helperText('Seleccione el paquete de precios para esta venta. Los productos usarán el precio de este paquete.')
+                                    ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                                        if ($state) {
+                                            $package = PricePackage::find($state);
+                                            if ($package) {
+                                                // Si el paquete es NIO, forzar la moneda a NIO
+                                                if ($package->isNIO()) {
+                                                    $set('currency', 'NIO');
+                                                    // Limpiar método de pago para que seleccione uno NIO
+                                                    $set('payment_method_id', null);
+
+                                                    \Filament\Notifications\Notification::make()
+                                                        ->warning()
+                                                        ->title('Paquete en Córdobas (NIO)')
+                                                        ->body('Este paquete usa precios en córdobas. Se filtrarán los métodos de pago compatibles.')
+                                                        ->send();
+                                                }
+                                                // Recalcular precios de los items
+                                                self::recalculateItemPricesForPackage($get, $set, $state);
+                                            }
+                                        }
+                                    })
+                                    ->helperText(fn (Get $get) =>
+                                        ($pkg = PricePackage::find($get('price_package_id')))
+                                            ? ($pkg->isNIO()
+                                                ? '⚠️ Paquete en CÓRDOBAS - Solo métodos de pago NIO disponibles'
+                                                : '✓ Paquete en USD')
+                                            : 'Seleccione el paquete de precios'
+                                    )
                                     ->columnSpanFull(),
 
                                 Forms\Components\Checkbox::make('without_supplier')
@@ -192,7 +225,19 @@ class SaleResource extends Resource
                             ->schema([
                                 Forms\Components\Select::make('payment_method_id')
                                     ->label('Método de Pago')
-                                    ->relationship('paymentMethod', 'name')
+                                    ->options(function (Get $get) {
+                                        $packageId = $get('price_package_id');
+                                        $package = $packageId ? PricePackage::find($packageId) : null;
+
+                                        $query = \App\Models\PaymentMethod::where('is_active', true);
+
+                                        // Si el paquete es NIO, solo mostrar métodos de pago NIO
+                                        if ($package && $package->isNIO()) {
+                                            $query->where('currency', 'NIO');
+                                        }
+
+                                        return $query->pluck('name', 'id');
+                                    })
                                     ->live()
                                     ->afterStateUpdated(function (Get $get, Set $set, $state) {
                                         // Cambiar moneda automáticamente según método de pago
@@ -204,6 +249,14 @@ class SaleResource extends Resource
                                                 self::convertCurrency($get, $set, $paymentMethod->currency);
                                             }
                                         }
+                                    })
+                                    ->helperText(function (Get $get) {
+                                        $packageId = $get('price_package_id');
+                                        $package = $packageId ? PricePackage::find($packageId) : null;
+                                        if ($package && $package->isNIO()) {
+                                            return '⚠️ Filtrado: Solo métodos de pago en córdobas (NIO)';
+                                        }
+                                        return null;
                                     })
                                     ->required(),
 
@@ -372,18 +425,39 @@ class SaleResource extends Resource
                                             ->columnSpan(1),
 
                                         Forms\Components\TextInput::make('unit_price')
-                                            ->label('Precio Unit. (USD)')
+                                            ->label(function (Get $get) {
+                                                $packageId = $get('../../price_package_id');
+                                                $package = $packageId ? PricePackage::find($packageId) : null;
+                                                $currency = $package?->currency ?? 'USD';
+                                                return 'Precio Unit. (' . $currency . ')';
+                                            })
                                             ->numeric()
-                                            ->prefix('$')
+                                            ->prefix(function (Get $get) {
+                                                $packageId = $get('../../price_package_id');
+                                                $package = $packageId ? PricePackage::find($packageId) : null;
+                                                return $package?->isNIO() ? 'C$' : '$';
+                                            })
                                             ->live(onBlur: true) // PERMITE EDITAR EL PRECIO
                                             ->afterStateUpdated(function ($state, Set $set, Get $get) {
                                                 $qty = $get('quantity') ?? 1;
                                                 $set('total_price', $state * $qty);
                                             })
                                             ->helperText(function (Get $get) {
-                                                $currency = $get('../../currency');
+                                                $packageId = $get('../../price_package_id');
+                                                $package = $packageId ? PricePackage::find($packageId) : null;
                                                 $price = floatval($get('unit_price') ?? 0);
 
+                                                // Si el paquete es NIO, mostrar conversión a USD
+                                                if ($package?->isNIO() && $price > 0) {
+                                                    $currencyModel = \App\Models\Currency::where('code', 'NIO')->first();
+                                                    if ($currencyModel) {
+                                                        $converted = $currencyModel->convertToUSD($price);
+                                                        return "≈ $" . number_format($converted, 2) . " USD";
+                                                    }
+                                                }
+
+                                                // Si no es NIO pero hay conversión de moneda
+                                                $currency = $get('../../currency');
                                                 if ($currency && $currency !== 'USD' && $price > 0) {
                                                     $currencyModel = \App\Models\Currency::where('code', $currency)->first();
                                                     if ($currencyModel) {
@@ -392,7 +466,7 @@ class SaleResource extends Resource
                                                     }
                                                 }
 
-                                                return 'Precio base en USD';
+                                                return $package?->isNIO() ? 'Precio en córdobas' : 'Precio en USD';
                                             })
                                             ->columnSpan(1),
                                             
@@ -693,6 +767,72 @@ class SaleResource extends Resource
                     ->title('Precios actualizados')
                     ->body("Los precios base se han actualizado según el proveedor: {$supplier->name}")
                     ->send();
+            }
+        }
+    }
+
+    /**
+     * Recalcular los precios de venta cuando cambia el paquete de precios
+     */
+    public static function recalculateItemPricesForPackage(Get $get, Set $set, $packageId): void
+    {
+        $items = $get('items');
+
+        if (!$items || !is_array($items) || !$packageId) {
+            return;
+        }
+
+        $package = PricePackage::find($packageId);
+        if (!$package) {
+            return;
+        }
+
+        $updatedItems = [];
+        $totalVenta = 0;
+
+        foreach ($items as $key => $item) {
+            $productId = $item['product_id'] ?? null;
+            $quantity = floatval($item['quantity'] ?? 1);
+
+            if ($productId) {
+                $product = Product::find($productId);
+                if ($product) {
+                    // Obtener precio del paquete
+                    $packagePrice = $product->getPriceForPackage($packageId);
+
+                    // Si no hay precio para el paquete, usar precio base
+                    if ($packagePrice <= 0) {
+                        $packagePrice = $product->price > 0 ? $product->price : 0;
+                    }
+
+                    $item['package_price'] = $packagePrice;
+                    $item['unit_price'] = $packagePrice;
+                    $item['total_price'] = $packagePrice * $quantity;
+
+                    $totalVenta += $item['total_price'];
+                }
+            }
+
+            $updatedItems[$key] = $item;
+        }
+
+        $set('items', $updatedItems);
+
+        // Actualizar total de la venta
+        if ($totalVenta > 0) {
+            $set('total_amount', $totalVenta);
+
+            // Si es paquete USD, actualizar amount_usd
+            if ($package->isUSD()) {
+                $set('amount_usd', $totalVenta);
+            } else {
+                // Si es NIO, convertir a USD
+                $currency = Currency::where('code', 'NIO')->first();
+                if ($currency) {
+                    $amountUsd = $currency->convertToUSD($totalVenta);
+                    $set('amount_usd', $amountUsd);
+                    $set('exchange_rate_used', $currency->exchange_rate);
+                }
             }
         }
     }

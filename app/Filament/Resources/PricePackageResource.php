@@ -41,6 +41,17 @@ class PricePackageResource extends Resource
                             ->default(true)
                             ->helperText('Los paquetes inactivos no aparecerán en las ventas'),
 
+                        Forms\Components\Select::make('currency')
+                            ->label('Moneda del Paquete')
+                            ->options([
+                                'USD' => '$ USD - Dólares',
+                                'NIO' => 'C$ NIO - Córdobas',
+                            ])
+                            ->default('USD')
+                            ->required()
+                            ->helperText('Si es NIO, la venta debe ser en córdobas')
+                            ->native(false),
+
                         Forms\Components\TextInput::make('sort_order')
                             ->label('Orden')
                             ->numeric()
@@ -64,6 +75,12 @@ class PricePackageResource extends Resource
                     ->label('Nombre')
                     ->searchable()
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('currency')
+                    ->label('Moneda')
+                    ->badge()
+                    ->color(fn ($state) => $state === 'NIO' ? 'warning' : 'success')
+                    ->formatStateUsing(fn ($state) => $state === 'NIO' ? 'C$ NIO' : '$ USD'),
 
                 Tables\Columns\TextColumn::make('description')
                     ->label('Descripción')
