@@ -18,6 +18,9 @@
     <div class="mb-4">
         <div class="flex gap-2 flex-wrap">
             @foreach($this->getActiveCurrencies() as $code => $name)
+                @php
+                    $stats = $this->getStatsForCurrency($code);
+                @endphp
                 <button
                     type="button"
                     wire:click="$set('activeTab', '{{ $code }}')"
@@ -27,12 +30,13 @@
                         'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600' => $activeTab !== $code,
                     ])
                 >
-                    {{ $this->getCurrencySymbol($code) }} {{ $code }}
-                    @php
-                        $stats = $this->getStatsForCurrency($code);
-                    @endphp
+                    @if($code === 'ALL')
+                        🌐 TODAS
+                    @else
+                        {{ $this->getCurrencySymbol($code) }} {{ $code }}
+                    @endif
                     <span class="ml-2 text-xs opacity-75">
-                        ({{ $stats['total_ventas'] }} ventas)
+                        ({{ $stats['total_ventas'] }})
                     </span>
                 </button>
             @endforeach
@@ -41,12 +45,21 @@
         {{-- Estadísticas de la moneda seleccionada --}}
         @php
             $currentStats = $this->getStatsForCurrency($activeTab);
+            $currencyLabel = $activeTab === 'ALL' ? 'USD (equivalente)' : $activeTab;
+            $currencySymbol = $activeTab === 'ALL' ? '$' : $this->getCurrencySymbol($activeTab);
         @endphp
         <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow border-l-4 border-green-500">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Total Ingresos ({{ $activeTab }})</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Total Ingresos
+                    @if($activeTab === 'ALL')
+                        <span class="text-xs">(en USD equivalente)</span>
+                    @else
+                        ({{ $activeTab }})
+                    @endif
+                </p>
                 <p class="text-2xl font-bold text-green-600">
-                    {{ $this->getCurrencySymbol($activeTab) }}{{ number_format($currentStats['total_ingresos'], 2) }}
+                    {{ $currencySymbol }}{{ number_format($currentStats['total_ingresos'], 2) }}
                 </p>
             </div>
             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow border-l-4 border-blue-500">
@@ -54,12 +67,23 @@
                 <p class="text-2xl font-bold text-blue-600">{{ $currentStats['total_ventas'] }}</p>
             </div>
             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow border-l-4 border-purple-500">
-                <p class="text-sm text-gray-500 dark:text-gray-400">Promedio por Venta</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Promedio por Venta
+                    @if($activeTab === 'ALL')
+                        <span class="text-xs">(USD)</span>
+                    @endif
+                </p>
                 <p class="text-2xl font-bold text-purple-600">
-                    {{ $this->getCurrencySymbol($activeTab) }}{{ number_format($currentStats['promedio_venta'], 2) }}
+                    {{ $currencySymbol }}{{ number_format($currentStats['promedio_venta'], 2) }}
                 </p>
             </div>
         </div>
+
+        @if($activeTab === 'ALL')
+            <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                💡 Vista global: Mostrando todas las ventas. Los totales se calculan en USD equivalente para comparación.
+            </div>
+        @endif
     </div>
 
     {{-- 4. TABLA DE VENTAS --}}

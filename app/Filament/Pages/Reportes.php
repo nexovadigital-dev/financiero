@@ -37,19 +37,19 @@ class Reportes extends Page implements HasForms, HasTable
     public ?array $filters = [
         'start_date' => null,
         'end_date' => null,
-        'currency' => 'USD',
+        'currency' => 'ALL',
         'source' => 'all',
         'payment_method_id' => 'all',
         'client_id' => null,
         'product_type' => 'all',
     ];
 
-    public string $activeTab = 'USD';
+    public string $activeTab = 'ALL';
 
     public function mount(): void
     {
-        $this->activeTab = 'USD';
-        $this->filters['currency'] = 'USD';
+        $this->activeTab = 'ALL'; // Por defecto mostrar TODAS las ventas
+        $this->filters['currency'] = 'ALL';
         $this->filters['start_date'] = now()->startOfMonth();
         $this->filters['end_date'] = now()->endOfDay();
     }
@@ -205,7 +205,11 @@ class Reportes extends Page implements HasForms, HasTable
                 $query->with(['client', 'paymentMethod', 'items.product']);
                 $query->whereNull('refunded_at');
                 $query->where('status', 'completed');
-                $query->where('currency', $this->activeTab);
+
+                // Solo filtrar por moneda si NO es "ALL" (todas)
+                if ($this->activeTab !== 'ALL') {
+                    $query->where('currency', $this->activeTab);
+                }
 
                 // Aplicar filtros de fecha
                 $startDate = $this->parseDate($data['start_date']);
@@ -279,39 +283,70 @@ class Reportes extends Page implements HasForms, HasTable
                     ->color('info')
                     ->limit(15),
 
+                Tables\Columns\TextColumn::make('currency')
+                    ->label('Moneda')
+                    ->badge()
+                    ->color(fn ($state) => match($state) {
+                        'USD' => 'success',
+                        'NIO' => 'warning',
+                        'USDT' => 'info',
+                        default => 'gray',
+                    })
+                    ->visible(fn () => $this->activeTab === 'ALL'),
+
                 Tables\Columns\TextColumn::make('total_amount')
                     ->label('Total')
-                    ->money(fn () => $this->activeTab)
+                    ->formatStateUsing(function ($record) {
+                        $currency = $record->currency ?? 'USD';
+                        $symbol = match($currency) {
+                            'NIO' => 'C$',
+                            'USD' => '$',
+                            'USDT' => '$',
+                            default => $currency . ' ',
+                        };
+                        return $symbol . number_format($record->total_amount, 2) . ' ' . $currency;
+                    })
                     ->weight('bold')
-                    ->color('success')
-                    ->summarize(Tables\Columns\Summarizers\Sum::make()
-                        ->label('TOTAL INGRESOS')
-                        ->money(fn () => $this->activeTab)),
+                    ->color('success'),
 
                 Tables\Columns\TextColumn::make('base_cost')
                     ->label('Costo')
-                    ->money(fn () => $this->activeTab)
+                    ->formatStateUsing(function ($record) {
+                        $currency = $record->currency ?? 'USD';
+                        $symbol = match($currency) {
+                            'NIO' => 'C$',
+                            'USD' => '$',
+                            'USDT' => '$',
+                            default => $currency . ' ',
+                        };
+                        $cost = $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity);
+                        return $symbol . number_format($cost, 2) . ' ' . $currency;
+                    })
                     ->color('warning')
-                    ->getStateUsing(fn ($record) => $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity))
-                    ->summarize(Tables\Columns\Summarizers\Summarizer::make()
-                        ->label('TOTAL COSTOS')
-                        ->money(fn () => $this->activeTab)
-                        ->using(fn ($query) => $this->calculateTotalCosts())),
+                    ->getStateUsing(fn ($record) => $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity)),
 
                 Tables\Columns\TextColumn::make('profit')
                     ->label('Ganancia')
-                    ->money(fn () => $this->activeTab)
+                    ->formatStateUsing(function ($record) {
+                        $currency = $record->currency ?? 'USD';
+                        $symbol = match($currency) {
+                            'NIO' => 'C$',
+                            'USD' => '$',
+                            'USDT' => '$',
+                            default => $currency . ' ',
+                        };
+                        $total = $record->total_amount;
+                        $cost = $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity);
+                        $profit = $total - $cost;
+                        return $symbol . number_format($profit, 2) . ' ' . $currency;
+                    })
                     ->weight('bold')
                     ->color('success')
                     ->getStateUsing(function ($record) {
                         $total = $record->total_amount;
                         $cost = $record->items->sum(fn ($item) => ($item->base_price ?? 0) * $item->quantity);
                         return $total - $cost;
-                    })
-                    ->summarize(Tables\Columns\Summarizers\Summarizer::make()
-                        ->label('GANANCIA NETA')
-                        ->money(fn () => $this->activeTab)
-                        ->using(fn ($query) => $this->calculateTotalProfit())),
+                    }),
 
             ])
             ->defaultSort('sale_date', 'desc')
@@ -385,11 +420,15 @@ class Reportes extends Page implements HasForms, HasTable
         $endDate = $this->parseDate($this->filters['end_date']) ?? now()->format('Y-m-d');
 
         $query = Sale::query()
-            ->where('currency', $currency)
             ->where('status', 'completed')
             ->whereNull('refunded_at')
             ->whereDate('sale_date', '>=', $startDate)
             ->whereDate('sale_date', '<=', $endDate);
+
+        // Solo filtrar por moneda si no es "ALL"
+        if ($currency !== 'ALL') {
+            $query->where('currency', $currency);
+        }
 
         if (! empty($this->filters['source']) && $this->filters['source'] !== 'all') {
             $query->where('source', $this->filters['source']);
@@ -406,7 +445,13 @@ class Reportes extends Page implements HasForms, HasTable
             });
         }
 
-        $totalIngresos = $query->sum('total_amount');
+        // Para "ALL", sumar amount_usd para tener un total comparable en USD
+        if ($currency === 'ALL') {
+            $totalIngresos = $query->sum('amount_usd');
+        } else {
+            $totalIngresos = $query->sum('total_amount');
+        }
+
         $totalVentas = $query->count();
 
         return [
@@ -422,7 +467,8 @@ class Reportes extends Page implements HasForms, HasTable
             ->pluck('name', 'code')
             ->toArray();
 
-        $ordered = [];
+        // Empezar con "TODAS" como primera opción
+        $ordered = ['ALL' => 'Todas las Monedas'];
 
         if (isset($currencies['USD'])) {
             $ordered['USD'] = $currencies['USD'];
@@ -442,6 +488,7 @@ class Reportes extends Page implements HasForms, HasTable
     public function getCurrencySymbol(string $code): string
     {
         return match ($code) {
+            'ALL' => '🌐',
             'USD' => '$',
             'NIO' => 'C$',
             'EUR' => '€',
