@@ -253,33 +253,16 @@ class Reportes extends Page implements HasForms, HasTable
             });
         }
 
-        // 3. INVERSIONES: Pagos a proveedores - SIEMPRE EN USD (sin filtro de moneda)
+        // 3. INVERSIONES: Pagos a proveedores - SIEMPRE EN USD
+        // Usar credits_received como valor real en USD (los créditos = valor USD)
         $gastosQuery = Expense::query()
             ->whereDate('payment_date', '>=', $startDate)
             ->whereDate('payment_date', '<=', $endDate);
 
         $cantidadGastos = $gastosQuery->count();
 
-        // Sumar amount_usd, pero si es 0 o null, calcular desde amount y currency
-        $totalGastos = $gastosQuery->get()->sum(function ($expense) {
-            // Si tiene amount_usd guardado, usarlo
-            if (($expense->amount_usd ?? 0) > 0) {
-                return $expense->amount_usd;
-            }
-            // Si no, convertir desde amount según la moneda
-            $amount = $expense->amount ?? 0;
-            $currency = $expense->currency ?? 'USD';
-
-            if ($currency === 'USD' || $currency === 'USDT') {
-                return $amount;
-            }
-            // Para otras monedas, usar la tasa de cambio guardada o buscar la actual
-            $exchangeRate = $expense->exchange_rate_used ?? 1;
-            if ($exchangeRate > 1) {
-                return $amount / $exchangeRate;
-            }
-            return $amount;
-        });
+        // Sumar credits_received (representa el valor real en USD depositado)
+        $totalGastos = $gastosQuery->sum('credits_received');
 
         // 4. COSTO DE VENTAS - SIEMPRE EN USD (base_price)
         $costoVentasQuery = Sale::query()
