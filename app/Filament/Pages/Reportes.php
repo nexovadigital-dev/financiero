@@ -277,8 +277,20 @@ class Reportes extends Page implements HasForms, HasTable
             });
         });
 
-        // 5. BALANCE/GANANCIA NETA
-        $balanceNeto = $totalIngresos - $totalGastos;
+        // 5. BALANCE NETO - SIEMPRE EN USD
+        // Usar amount_usd de ingresos para comparar con inversiones (también en USD)
+        $ingresosUsdQuery = Sale::query()
+            ->where('status', 'completed')
+            ->whereNull('refunded_at')
+            ->whereDate('sale_date', '>=', $startDate)
+            ->whereDate('sale_date', '<=', $endDate);
+
+        if ($creditosServidorId) {
+            $ingresosUsdQuery->where('payment_method_id', '!=', $creditosServidorId);
+        }
+
+        $ingresosUsd = $ingresosUsdQuery->sum('amount_usd');
+        $balanceNeto = $ingresosUsd - $totalGastos;
 
         // 6. GANANCIA BRUTA = Ingresos - Costo de Ventas
         $gananciaBruta = $totalIngresos - $costoVentas;

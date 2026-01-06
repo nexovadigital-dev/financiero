@@ -153,7 +153,7 @@
             </div>
         </div>
 
-        {{-- BALANCE NETO --}}
+        {{-- BALANCE NETO - SIEMPRE EN USD --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 relative overflow-hidden">
             <div class="absolute top-0 right-0 w-16 h-16 {{ $financialStats['balance_neto'] >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10' }} rounded-full -mr-8 -mt-8"></div>
             <div class="relative">
@@ -166,10 +166,10 @@
                     <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Balance Neto</span>
                 </div>
                 <p class="text-xl font-bold {{ $financialStats['balance_neto'] >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400' }}">
-                    {{ $financialStats['balance_neto'] >= 0 ? '' : '-' }}{{ $currencySymbol }}{{ number_format(abs($financialStats['balance_neto']), 2) }}
+                    {{ $financialStats['balance_neto'] >= 0 ? '' : '-' }}${{ number_format(abs($financialStats['balance_neto']), 2) }} USD
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Ingresos - Inversiones
+                    Ingresos USD - Inversiones USD
                 </p>
             </div>
         </div>
