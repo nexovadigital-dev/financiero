@@ -229,29 +229,23 @@ class Reportes extends Page implements HasForms, HasTable
         }
         $cantidadVentasIngresos = $ingresosQuery->count();
 
-        // 2. USO DE CRÉDITOS: Total de base_price (USD) gastado del balance de proveedores
-        // Solo ventas CON método "Créditos Servidor" - SIEMPRE EN USD (sin filtro de moneda)
-        $totalEgresos = 0;
-        $cantidadVentasCreditos = 0;
+        // 2. USO DE CRÉDITOS: Total de base_price (USD) gastado de TODAS las ventas
+        // Representa el costo real de los productos vendidos - SIEMPRE EN USD
+        $egresosQuery = Sale::query()
+            ->where('status', 'completed')
+            ->whereNull('refunded_at')
+            ->whereDate('sale_date', '>=', $startDate)
+            ->whereDate('sale_date', '<=', $endDate)
+            ->with('items');
 
-        if ($creditosServidorId) {
-            $egresosQuery = Sale::query()
-                ->where('status', 'completed')
-                ->whereNull('refunded_at')
-                ->whereDate('sale_date', '>=', $startDate)
-                ->whereDate('sale_date', '<=', $endDate)
-                ->where('payment_method_id', $creditosServidorId)
-                ->with('items');
-
-            // NO filtrar por moneda - siempre sumar todo en USD
-            $cantidadVentasCreditos = $egresosQuery->count();
-            // Siempre sumar base_price en USD (lo que se debita del proveedor)
-            $totalEgresos = $egresosQuery->get()->sum(function ($sale) {
-                return $sale->items->sum(function ($item) {
-                    return ($item->base_price ?? 0) * $item->quantity;
-                });
+        // NO filtrar por moneda - siempre sumar todo en USD
+        $cantidadVentasCreditos = $egresosQuery->count();
+        // Siempre sumar base_price en USD (costo real del proveedor)
+        $totalEgresos = $egresosQuery->get()->sum(function ($sale) {
+            return $sale->items->sum(function ($item) {
+                return ($item->base_price ?? 0) * $item->quantity;
             });
-        }
+        });
 
         // 3. INVERSIONES: Pagos a proveedores - SIEMPRE EN USD
         // Usar credits_received como valor real en USD (los créditos = valor USD)
