@@ -66,7 +66,7 @@
             </div>
         </div>
 
-        {{-- COSTO DE VENTAS (Débito proveedor) --}}
+        {{-- COSTO DE VENTAS (Débito proveedor) - SIEMPRE EN USD --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 relative overflow-hidden">
             <div class="absolute top-0 right-0 w-20 h-20 bg-yellow-500/10 rounded-full -mr-10 -mt-10"></div>
             <div class="relative">
@@ -79,10 +79,10 @@
                     <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Costo de Ventas</span>
                 </div>
                 <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                    {{ $currencySymbol }}{{ number_format($financialStats['costo_ventas'] ?? 0, 2) }}
+                    ${{ number_format($financialStats['costo_ventas'] ?? 0, 2) }} USD
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Débito del balance proveedor
+                    Precio base proveedor (USD)
                 </p>
             </div>
         </div>
@@ -111,7 +111,7 @@
 
     {{-- Segunda fila: 4 indicadores secundarios --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {{-- EGRESOS POR CRÉDITOS --}}
+        {{-- USO DE CRÉDITOS - SIEMPRE EN USD --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 relative overflow-hidden">
             <div class="absolute top-0 right-0 w-16 h-16 bg-orange-500/10 rounded-full -mr-8 -mt-8"></div>
             <div class="relative">
@@ -124,15 +124,15 @@
                     <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Uso de Créditos</span>
                 </div>
                 <p class="text-xl font-bold text-orange-600 dark:text-orange-400">
-                    {{ $currencySymbol }}{{ number_format($financialStats['egresos_creditos'], 2) }}
+                    ${{ number_format($financialStats['egresos_creditos'], 2) }} USD
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {{ $financialStats['egresos_count'] }} operaciones
+                    {{ $financialStats['egresos_count'] }} operaciones (balance proveedor)
                 </p>
             </div>
         </div>
 
-        {{-- GASTOS/INVERSIONES --}}
+        {{-- INVERSIONES - SIEMPRE EN USD --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 relative overflow-hidden">
             <div class="absolute top-0 right-0 w-16 h-16 bg-red-500/10 rounded-full -mr-8 -mt-8"></div>
             <div class="relative">
@@ -145,7 +145,7 @@
                     <span class="text-xs font-medium text-gray-500 dark:text-gray-400">Inversiones</span>
                 </div>
                 <p class="text-xl font-bold text-red-600 dark:text-red-400">
-                    {{ $currencySymbol }}{{ number_format($financialStats['gastos'], 2) }}
+                    ${{ number_format($financialStats['gastos'], 2) }} USD
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {{ $financialStats['gastos_count'] }} pagos a proveedores

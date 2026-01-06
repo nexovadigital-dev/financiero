@@ -229,40 +229,44 @@ class Reportes extends Page implements HasForms, HasTable
         }
         $cantidadVentasIngresos = $ingresosQuery->count();
 
-        // 2. EGRESOS POR CRÉDITOS: Ventas CON método "Créditos Servidor"
-        $egresosQuery = clone $baseQuery;
+        // 2. USO DE CRÉDITOS: Total de base_price (USD) gastado del balance de proveedores
+        // Solo ventas CON método "Créditos Servidor" - SIEMPRE EN USD
+        $egresosQuery = Sale::query()
+            ->where('status', 'completed')
+            ->whereNull('refunded_at')
+            ->whereDate('sale_date', '>=', $startDate)
+            ->whereDate('sale_date', '<=', $endDate)
+            ->with('items');
+
+        // Aplicar filtro de moneda si no es "ALL"
+        if ($currency !== 'ALL') {
+            $egresosQuery->where('currency', $currency);
+        }
+
         $totalEgresos = 0;
         $cantidadVentasCreditos = 0;
 
         if ($creditosServidorId) {
             $egresosQuery->where('payment_method_id', $creditosServidorId);
-            if ($currency === 'ALL') {
-                $totalEgresos = $egresosQuery->sum('amount_usd');
-            } else {
-                $totalEgresos = $egresosQuery->sum('total_amount');
-            }
             $cantidadVentasCreditos = $egresosQuery->count();
+            // Siempre sumar base_price en USD (lo que se debita del proveedor)
+            $totalEgresos = $egresosQuery->get()->sum(function ($sale) {
+                return $sale->items->sum(function ($item) {
+                    return ($item->base_price ?? 0) * $item->quantity;
+                });
+            });
         }
 
-        // 3. GASTOS/INVERSIONES: Pagos a proveedores
+        // 3. INVERSIONES: Pagos a proveedores - SIEMPRE EN USD
         $gastosQuery = Expense::query()
             ->whereDate('payment_date', '>=', $startDate)
             ->whereDate('payment_date', '<=', $endDate);
 
-        // Para gastos, filtrar por moneda del proveedor si aplica
-        if ($currency !== 'ALL') {
-            $gastosQuery->where('currency', $currency);
-            $totalGastos = $gastosQuery->sum('amount');
-        } else {
-            // Si es ALL, sumar en USD equivalente
-            $totalGastos = Expense::query()
-                ->whereDate('payment_date', '>=', $startDate)
-                ->whereDate('payment_date', '<=', $endDate)
-                ->sum('amount_usd');
-        }
+        // Siempre sumar amount_usd (total en USD)
+        $totalGastos = $gastosQuery->sum('amount_usd');
         $cantidadGastos = $gastosQuery->count();
 
-        // 4. COSTO DE VENTAS (Débito del proveedor)
+        // 4. COSTO DE VENTAS - SIEMPRE EN USD (base_price)
         $costoVentasQuery = Sale::query()
             ->where('status', 'completed')
             ->whereNull('refunded_at')
@@ -274,20 +278,10 @@ class Reportes extends Page implements HasForms, HasTable
             $costoVentasQuery->where('currency', $currency);
         }
 
-        $costoVentas = $costoVentasQuery->get()->sum(function ($sale) use ($currency) {
-            return $sale->items->sum(function ($item) use ($currency, $sale) {
-                // Si es USD o USDT, no convertir
-                if (in_array($currency, ['USD', 'USDT', 'ALL'])) {
-                    return ($item->base_price ?? 0) * $item->quantity;
-                }
-                // Para NIO, preferir base_price_nio si existe
-                if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
-                    return $item->base_price_nio * $item->quantity;
-                }
-                // Para cualquier otra moneda, convertir base_price (USD) usando tasa de cambio
-                $basePriceUsd = $item->base_price ?? 0;
-                $exchangeRate = $sale->exchange_rate_used ?? 1;
-                return ($basePriceUsd * $exchangeRate) * $item->quantity;
+        // Siempre sumar base_price en USD
+        $costoVentas = $costoVentasQuery->get()->sum(function ($sale) {
+            return $sale->items->sum(function ($item) {
+                return ($item->base_price ?? 0) * $item->quantity;
             });
         });
 
