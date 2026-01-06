@@ -276,19 +276,18 @@ class Reportes extends Page implements HasForms, HasTable
 
         $costoVentas = $costoVentasQuery->get()->sum(function ($sale) use ($currency) {
             return $sale->items->sum(function ($item) use ($currency, $sale) {
-                // Si moneda es NIO
-                if ($currency === 'NIO') {
-                    // Preferir base_price_nio si existe
-                    if (($item->base_price_nio ?? 0) > 0) {
-                        return $item->base_price_nio * $item->quantity;
-                    }
-                    // Si no, convertir base_price (USD) a NIO usando tasa de cambio de la venta
-                    $basePriceUsd = $item->base_price ?? 0;
-                    $exchangeRate = $sale->exchange_rate_used ?? 37;
-                    return ($basePriceUsd * $exchangeRate) * $item->quantity;
+                // Si es USD o USDT, no convertir
+                if (in_array($currency, ['USD', 'USDT', 'ALL'])) {
+                    return ($item->base_price ?? 0) * $item->quantity;
                 }
-                // Para otras monedas, usar base_price (USD)
-                return ($item->base_price ?? 0) * $item->quantity;
+                // Para NIO, preferir base_price_nio si existe
+                if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                    return $item->base_price_nio * $item->quantity;
+                }
+                // Para cualquier otra moneda, convertir base_price (USD) usando tasa de cambio
+                $basePriceUsd = $item->base_price ?? 0;
+                $exchangeRate = $sale->exchange_rate_used ?? 1;
+                return ($basePriceUsd * $exchangeRate) * $item->quantity;
             });
         });
 
@@ -438,21 +437,23 @@ class Reportes extends Page implements HasForms, HasTable
                             'NIO' => 'C$',
                             'USD' => '$',
                             'USDT' => '$',
+                            'COP' => 'COP ',
                             default => $currency . ' ',
                         };
-                        // Si es NIO, convertir base_price (USD) a NIO
+                        // Si NO es USD/USDT, convertir base_price (USD) a la moneda de la venta
                         $cost = $record->items->sum(function ($item) use ($currency, $record) {
-                            if ($currency === 'NIO') {
-                                // Preferir base_price_nio si existe
-                                if (($item->base_price_nio ?? 0) > 0) {
-                                    return $item->base_price_nio * $item->quantity;
-                                }
-                                // Si no, convertir base_price (USD) a NIO usando tasa de cambio
-                                $basePriceUsd = $item->base_price ?? 0;
-                                $exchangeRate = $record->exchange_rate_used ?? 37; // Default tasa NIO
-                                return ($basePriceUsd * $exchangeRate) * $item->quantity;
+                            // Si es USD o USDT, no convertir
+                            if (in_array($currency, ['USD', 'USDT'])) {
+                                return ($item->base_price ?? 0) * $item->quantity;
                             }
-                            return ($item->base_price ?? 0) * $item->quantity;
+                            // Para NIO, preferir base_price_nio si existe
+                            if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                                return $item->base_price_nio * $item->quantity;
+                            }
+                            // Para cualquier otra moneda, convertir base_price (USD) usando tasa de cambio
+                            $basePriceUsd = $item->base_price ?? 0;
+                            $exchangeRate = $record->exchange_rate_used ?? 1;
+                            return ($basePriceUsd * $exchangeRate) * $item->quantity;
                         });
                         return $symbol . number_format($cost, 2) . ' ' . $currency;
                     })
@@ -460,15 +461,15 @@ class Reportes extends Page implements HasForms, HasTable
                     ->getStateUsing(function ($record) {
                         $currency = $record->currency ?? 'USD';
                         return $record->items->sum(function ($item) use ($currency, $record) {
-                            if ($currency === 'NIO') {
-                                if (($item->base_price_nio ?? 0) > 0) {
-                                    return $item->base_price_nio * $item->quantity;
-                                }
-                                $basePriceUsd = $item->base_price ?? 0;
-                                $exchangeRate = $record->exchange_rate_used ?? 37;
-                                return ($basePriceUsd * $exchangeRate) * $item->quantity;
+                            if (in_array($currency, ['USD', 'USDT'])) {
+                                return ($item->base_price ?? 0) * $item->quantity;
                             }
-                            return ($item->base_price ?? 0) * $item->quantity;
+                            if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                                return $item->base_price_nio * $item->quantity;
+                            }
+                            $basePriceUsd = $item->base_price ?? 0;
+                            $exchangeRate = $record->exchange_rate_used ?? 1;
+                            return ($basePriceUsd * $exchangeRate) * $item->quantity;
                         });
                     }),
 
@@ -480,20 +481,21 @@ class Reportes extends Page implements HasForms, HasTable
                             'NIO' => 'C$',
                             'USD' => '$',
                             'USDT' => '$',
+                            'COP' => 'COP ',
                             default => $currency . ' ',
                         };
                         $total = $record->total_amount;
-                        // Si es NIO, convertir base_price (USD) a NIO
+                        // Si NO es USD/USDT, convertir base_price (USD) a la moneda de la venta
                         $cost = $record->items->sum(function ($item) use ($currency, $record) {
-                            if ($currency === 'NIO') {
-                                if (($item->base_price_nio ?? 0) > 0) {
-                                    return $item->base_price_nio * $item->quantity;
-                                }
-                                $basePriceUsd = $item->base_price ?? 0;
-                                $exchangeRate = $record->exchange_rate_used ?? 37;
-                                return ($basePriceUsd * $exchangeRate) * $item->quantity;
+                            if (in_array($currency, ['USD', 'USDT'])) {
+                                return ($item->base_price ?? 0) * $item->quantity;
                             }
-                            return ($item->base_price ?? 0) * $item->quantity;
+                            if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                                return $item->base_price_nio * $item->quantity;
+                            }
+                            $basePriceUsd = $item->base_price ?? 0;
+                            $exchangeRate = $record->exchange_rate_used ?? 1;
+                            return ($basePriceUsd * $exchangeRate) * $item->quantity;
                         });
                         $profit = $total - $cost;
                         return $symbol . number_format($profit, 2) . ' ' . $currency;
@@ -504,15 +506,15 @@ class Reportes extends Page implements HasForms, HasTable
                         $currency = $record->currency ?? 'USD';
                         $total = $record->total_amount;
                         $cost = $record->items->sum(function ($item) use ($currency, $record) {
-                            if ($currency === 'NIO') {
-                                if (($item->base_price_nio ?? 0) > 0) {
-                                    return $item->base_price_nio * $item->quantity;
-                                }
-                                $basePriceUsd = $item->base_price ?? 0;
-                                $exchangeRate = $record->exchange_rate_used ?? 37;
-                                return ($basePriceUsd * $exchangeRate) * $item->quantity;
+                            if (in_array($currency, ['USD', 'USDT'])) {
+                                return ($item->base_price ?? 0) * $item->quantity;
                             }
-                            return ($item->base_price ?? 0) * $item->quantity;
+                            if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                                return $item->base_price_nio * $item->quantity;
+                            }
+                            $basePriceUsd = $item->base_price ?? 0;
+                            $exchangeRate = $record->exchange_rate_used ?? 1;
+                            return ($basePriceUsd * $exchangeRate) * $item->quantity;
                         });
                         return $total - $cost;
                     }),
@@ -558,15 +560,15 @@ class Reportes extends Page implements HasForms, HasTable
             ->get()
             ->sum(function ($sale) use ($currency) {
                 return $sale->items->sum(function ($item) use ($currency, $sale) {
-                    if ($currency === 'NIO') {
-                        if (($item->base_price_nio ?? 0) > 0) {
-                            return $item->base_price_nio * $item->quantity;
-                        }
-                        $basePriceUsd = $item->base_price ?? 0;
-                        $exchangeRate = $sale->exchange_rate_used ?? 37;
-                        return ($basePriceUsd * $exchangeRate) * $item->quantity;
+                    if (in_array($currency, ['USD', 'USDT'])) {
+                        return ($item->base_price ?? 0) * $item->quantity;
                     }
-                    return ($item->base_price ?? 0) * $item->quantity;
+                    if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                        return $item->base_price_nio * $item->quantity;
+                    }
+                    $basePriceUsd = $item->base_price ?? 0;
+                    $exchangeRate = $sale->exchange_rate_used ?? 1;
+                    return ($basePriceUsd * $exchangeRate) * $item->quantity;
                 });
             });
     }
@@ -593,15 +595,15 @@ class Reportes extends Page implements HasForms, HasTable
         return $sales->sum(function ($sale) use ($currency) {
             $total = $sale->total_amount;
             $cost = $sale->items->sum(function ($item) use ($currency, $sale) {
-                if ($currency === 'NIO') {
-                    if (($item->base_price_nio ?? 0) > 0) {
-                        return $item->base_price_nio * $item->quantity;
-                    }
-                    $basePriceUsd = $item->base_price ?? 0;
-                    $exchangeRate = $sale->exchange_rate_used ?? 37;
-                    return ($basePriceUsd * $exchangeRate) * $item->quantity;
+                if (in_array($currency, ['USD', 'USDT'])) {
+                    return ($item->base_price ?? 0) * $item->quantity;
                 }
-                return ($item->base_price ?? 0) * $item->quantity;
+                if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
+                    return $item->base_price_nio * $item->quantity;
+                }
+                $basePriceUsd = $item->base_price ?? 0;
+                $exchangeRate = $sale->exchange_rate_used ?? 1;
+                return ($basePriceUsd * $exchangeRate) * $item->quantity;
             });
             return $total - $cost;
         });
