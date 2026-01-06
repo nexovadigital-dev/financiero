@@ -230,24 +230,20 @@ class Reportes extends Page implements HasForms, HasTable
         $cantidadVentasIngresos = $ingresosQuery->count();
 
         // 2. USO DE CRÉDITOS: Total de base_price (USD) gastado del balance de proveedores
-        // Solo ventas CON método "Créditos Servidor" - SIEMPRE EN USD
-        $egresosQuery = Sale::query()
-            ->where('status', 'completed')
-            ->whereNull('refunded_at')
-            ->whereDate('sale_date', '>=', $startDate)
-            ->whereDate('sale_date', '<=', $endDate)
-            ->with('items');
-
-        // Aplicar filtro de moneda si no es "ALL"
-        if ($currency !== 'ALL') {
-            $egresosQuery->where('currency', $currency);
-        }
-
+        // Solo ventas CON método "Créditos Servidor" - SIEMPRE EN USD (sin filtro de moneda)
         $totalEgresos = 0;
         $cantidadVentasCreditos = 0;
 
         if ($creditosServidorId) {
-            $egresosQuery->where('payment_method_id', $creditosServidorId);
+            $egresosQuery = Sale::query()
+                ->where('status', 'completed')
+                ->whereNull('refunded_at')
+                ->whereDate('sale_date', '>=', $startDate)
+                ->whereDate('sale_date', '<=', $endDate)
+                ->where('payment_method_id', $creditosServidorId)
+                ->with('items');
+
+            // NO filtrar por moneda - siempre sumar todo en USD
             $cantidadVentasCreditos = $egresosQuery->count();
             // Siempre sumar base_price en USD (lo que se debita del proveedor)
             $totalEgresos = $egresosQuery->get()->sum(function ($sale) {
@@ -257,14 +253,33 @@ class Reportes extends Page implements HasForms, HasTable
             });
         }
 
-        // 3. INVERSIONES: Pagos a proveedores - SIEMPRE EN USD
+        // 3. INVERSIONES: Pagos a proveedores - SIEMPRE EN USD (sin filtro de moneda)
         $gastosQuery = Expense::query()
             ->whereDate('payment_date', '>=', $startDate)
             ->whereDate('payment_date', '<=', $endDate);
 
-        // Siempre sumar amount_usd (total en USD)
-        $totalGastos = $gastosQuery->sum('amount_usd');
         $cantidadGastos = $gastosQuery->count();
+
+        // Sumar amount_usd, pero si es 0 o null, calcular desde amount y currency
+        $totalGastos = $gastosQuery->get()->sum(function ($expense) {
+            // Si tiene amount_usd guardado, usarlo
+            if (($expense->amount_usd ?? 0) > 0) {
+                return $expense->amount_usd;
+            }
+            // Si no, convertir desde amount según la moneda
+            $amount = $expense->amount ?? 0;
+            $currency = $expense->currency ?? 'USD';
+
+            if ($currency === 'USD' || $currency === 'USDT') {
+                return $amount;
+            }
+            // Para otras monedas, usar la tasa de cambio guardada o buscar la actual
+            $exchangeRate = $expense->exchange_rate_used ?? 1;
+            if ($exchangeRate > 1) {
+                return $amount / $exchangeRate;
+            }
+            return $amount;
+        });
 
         // 4. COSTO DE VENTAS - SIEMPRE EN USD (base_price)
         $costoVentasQuery = Sale::query()
