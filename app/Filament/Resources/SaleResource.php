@@ -362,7 +362,7 @@ class SaleResource extends Resource
                             ->label('Productos de la Venta')
                             ->helperText('⚠️ Debe agregar al menos un producto a la venta')
                             ->schema([
-                                Forms\Components\Grid::make(6)
+                                Forms\Components\Grid::make(5)
                                     ->schema([
                                         Forms\Components\Select::make('product_id')
                                             ->label('Producto')
@@ -447,25 +447,27 @@ class SaleResource extends Resource
                                             })
                                             ->columnSpan(1),
 
-                                        // Precio Base USD (visible, no editable)
+                                        // Precio Base USD (editable)
                                         Forms\Components\TextInput::make('base_price')
                                             ->label('Costo USD')
                                             ->numeric()
                                             ->prefix('$')
-                                            ->disabled()
+                                            ->step(0.01)
+                                            ->minValue(0)
                                             ->dehydrated()
                                             ->extraInputAttributes(['style' => 'background-color: #fef3c7; color: #92400e; font-weight: bold;'])
                                             ->columnSpan(1),
 
-                                        // Precio Base NIO (visible, no editable)
+                                        // Precio Base NIO (editable, solo visible cuando moneda es NIO)
                                         Forms\Components\TextInput::make('base_price_nio')
                                             ->label('Costo NIO')
                                             ->numeric()
                                             ->prefix('C$')
-                                            ->disabled()
+                                            ->step(0.01)
+                                            ->minValue(0)
                                             ->dehydrated()
-                                            ->placeholder('N/A')
                                             ->extraInputAttributes(['style' => 'background-color: #dbeafe; color: #1e40af; font-weight: bold;'])
+                                            ->visible(fn (Get $get) => $get('../../currency') === 'NIO')
                                             ->columnSpan(1),
 
                                         // Campos ocultos para guardar precios
