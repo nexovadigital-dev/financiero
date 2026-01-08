@@ -150,13 +150,7 @@ class ProductResource extends Resource
                                             ->default(null)
                                             ->minValue(0)
                                             ->step(0.01)
-                                            ->helperText('Para reportes al banco')
-                                            ->visible(function (Get $get) {
-                                                $supplierId = $get('supplier_id');
-                                                if (!$supplierId) return false;
-                                                $supplier = \App\Models\Supplier::find($supplierId);
-                                                return $supplier && $supplier->payment_currency === 'LOCAL';
-                                            }),
+                                            ->helperText('Precio en Córdobas para exportación al banco'),
                                     ]),
                             ])
                             ->defaultItems(0)

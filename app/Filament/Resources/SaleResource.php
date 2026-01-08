@@ -231,9 +231,12 @@ class SaleResource extends Resource
 
                                         $query = \App\Models\PaymentMethod::where('is_active', true);
 
-                                        // Si el paquete es NIO, solo mostrar métodos de pago NIO
+                                        // Si el paquete es NIO, mostrar métodos NIO + Créditos Servidor (siempre disponible)
                                         if ($package && $package->isNIO()) {
-                                            $query->where('currency', 'NIO');
+                                            $query->where(function ($q) {
+                                                $q->where('currency', 'NIO')
+                                                  ->orWhere('name', 'Créditos Servidor');
+                                            });
                                         }
 
                                         return $query->pluck('name', 'id');
@@ -359,7 +362,7 @@ class SaleResource extends Resource
                             ->label('Productos de la Venta')
                             ->helperText('⚠️ Debe agregar al menos un producto a la venta')
                             ->schema([
-                                Forms\Components\Grid::make(5)
+                                Forms\Components\Grid::make(6)
                                     ->schema([
                                         Forms\Components\Select::make('product_id')
                                             ->label('Producto')
@@ -400,7 +403,7 @@ class SaleResource extends Resource
 
                                                     // 5. Guardar precios
                                                     $set('base_price', $basePrice); // Precio que se debita del proveedor (USD)
-                                                    $set('base_price_nio', $basePriceNio); // Precio en NIO para reportes
+                                                    $set('base_price_nio', $basePriceNio ?? 0); // Precio en NIO para reportes
                                                     $set('package_price', $packagePrice); // Precio que se cobra al cliente
                                                     $set('unit_price', $packagePrice); // Para compatibilidad
 
@@ -429,7 +432,7 @@ class SaleResource extends Resource
                                                 $packageId = $get('../../price_package_id');
                                                 $package = $packageId ? PricePackage::find($packageId) : null;
                                                 $currency = $package?->currency ?? 'USD';
-                                                return 'Precio Unit. (' . $currency . ')';
+                                                return 'P. Venta (' . $currency . ')';
                                             })
                                             ->numeric()
                                             ->prefix(function (Get $get) {
@@ -442,63 +445,31 @@ class SaleResource extends Resource
                                                 $qty = $get('quantity') ?? 1;
                                                 $set('total_price', $state * $qty);
                                             })
-                                            ->helperText(function (Get $get) {
-                                                $packageId = $get('../../price_package_id');
-                                                $package = $packageId ? PricePackage::find($packageId) : null;
-                                                $price = floatval($get('unit_price') ?? 0);
-
-                                                // Si el paquete es NIO, mostrar conversión a USD
-                                                if ($package?->isNIO() && $price > 0) {
-                                                    $currencyModel = \App\Models\Currency::where('code', 'NIO')->first();
-                                                    if ($currencyModel) {
-                                                        $converted = $currencyModel->convertToUSD($price);
-                                                        return "≈ $" . number_format($converted, 2) . " USD";
-                                                    }
-                                                }
-
-                                                // Si no es NIO pero hay conversión de moneda
-                                                $currency = $get('../../currency');
-                                                if ($currency && $currency !== 'USD' && $price > 0) {
-                                                    $currencyModel = \App\Models\Currency::where('code', $currency)->first();
-                                                    if ($currencyModel) {
-                                                        $converted = $currencyModel->convertFromUSD($price);
-                                                        return "≈ " . number_format($converted, 2) . " " . $currency;
-                                                    }
-                                                }
-
-                                                return $package?->isNIO() ? 'Precio en córdobas' : 'Precio en USD';
-                                            })
                                             ->columnSpan(1),
-                                            
-                                        // Mostrar precio base del proveedor
-                                        Forms\Components\Placeholder::make('base_price_info')
-                                            ->label('Costo Proveedor')
-                                            ->content(function (Get $get) {
-                                                $basePrice = floatval($get('base_price') ?? 0);
-                                                $basePriceNio = $get('base_price_nio');
-                                                $supplierId = $get('../../supplier_id');
 
-                                                if ($basePrice <= 0) {
-                                                    return '-';
-                                                }
+                                        // Precio Base USD (visible, no editable)
+                                        Forms\Components\TextInput::make('base_price')
+                                            ->label('Costo USD')
+                                            ->numeric()
+                                            ->prefix('$')
+                                            ->disabled()
+                                            ->dehydrated()
+                                            ->extraInputAttributes(['style' => 'background-color: #fef3c7; color: #92400e; font-weight: bold;'])
+                                            ->columnSpan(1),
 
-                                                $html = '<span style="color: #f97316; font-weight: 600;">$' . number_format($basePrice, 2) . ' USD</span>';
-
-                                                // Si es proveedor Moneda Local y tiene precio NIO
-                                                if ($basePriceNio && $basePriceNio > 0) {
-                                                    $html .= '<br><span style="color: #3b82f6; font-size: 0.85em;">C$ ' . number_format($basePriceNio, 2) . ' NIO</span>';
-                                                }
-
-                                                return new \Illuminate\Support\HtmlString($html);
-                                            })
+                                        // Precio Base NIO (visible, no editable)
+                                        Forms\Components\TextInput::make('base_price_nio')
+                                            ->label('Costo NIO')
+                                            ->numeric()
+                                            ->prefix('C$')
+                                            ->disabled()
+                                            ->dehydrated()
+                                            ->placeholder('N/A')
+                                            ->extraInputAttributes(['style' => 'background-color: #dbeafe; color: #1e40af; font-weight: bold;'])
                                             ->columnSpan(1),
 
                                         // Campos ocultos para guardar precios
                                         Forms\Components\Hidden::make('total_price')
-                                            ->dehydrated(),
-                                        Forms\Components\Hidden::make('base_price')
-                                            ->dehydrated(),
-                                        Forms\Components\Hidden::make('base_price_nio')
                                             ->dehydrated(),
                                         Forms\Components\Hidden::make('package_price')
                                             ->dehydrated(),
