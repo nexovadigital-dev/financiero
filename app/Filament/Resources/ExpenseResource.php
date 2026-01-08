@@ -29,104 +29,106 @@ class ExpenseResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Registrar Pago a Proveedor')
-                    ->description('El pago se registrará en la moneda del proveedor y los créditos se sumarán a su balance.')
+                    ->description('Seleccione el proveedor, el tipo de pago y los créditos que recibirá.')
                     ->schema([
-                        // 1. Selector de Proveedor (determina la moneda)
-                        Forms\Components\Select::make('supplier_id')
-                            ->label('Proveedor')
-                            ->options(function () {
-                                return Supplier::all()->mapWithKeys(function ($supplier) {
-                                    $currency = $supplier->payment_currency === 'USDT' ? 'USDT' : 'NIO';
-                                    $balance = number_format($supplier->balance, 2);
-                                    return [$supplier->id => "{$supplier->name} ({$currency}) - Balance: {$balance}"];
-                                });
-                            })
-                            ->required()
-                            ->native(false)
-                            ->preload()
-                            ->live()
-                            ->afterStateUpdated(function (Get $get, Set $set, $state) {
-                                if (!$state) {
-                                    $set('currency', null);
-                                    return;
-                                }
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                // 1. Selector de Proveedor
+                                Forms\Components\Select::make('supplier_id')
+                                    ->label('Proveedor')
+                                    ->options(function () {
+                                        return Supplier::all()->mapWithKeys(function ($supplier) {
+                                            $balance = number_format($supplier->balance, 2);
+                                            return [$supplier->id => "{$supplier->name} - Balance: {$balance}"];
+                                        });
+                                    })
+                                    ->required()
+                                    ->native(false)
+                                    ->preload()
+                                    ->live()
+                                    ->helperText('Seleccione el proveedor al que realizará el pago'),
 
-                                $supplier = Supplier::find($state);
-                                if ($supplier) {
-                                    // Establecer moneda basada en el proveedor
-                                    $currency = $supplier->payment_currency === 'USDT' ? 'USDT' : 'NIO';
-                                    $set('currency', $currency);
-                                }
-                            })
-                            ->helperText('Seleccione el proveedor para ver su moneda de pago'),
+                                // 2. Tipo de Pago (moneda)
+                                Forms\Components\Select::make('currency')
+                                    ->label('Tipo de Pago')
+                                    ->options([
+                                        'USDT' => '💵 USDT Cripto (Binance/Tether)',
+                                        'NIO' => '🇳🇮 Transferencia Nicaragua (Córdobas NIO)',
+                                        'USD' => '💲 Transferencia Nicaragua (Dólares USD)',
+                                    ])
+                                    ->required()
+                                    ->native(false)
+                                    ->live()
+                                    ->helperText('Seleccione cómo realizará el pago'),
+                            ]),
 
-                        // Mostrar moneda del proveedor (solo lectura)
-                        Forms\Components\Placeholder::make('supplier_currency_info')
-                            ->label('Moneda de Pago')
+                        // Mostrar balance actual del proveedor
+                        Forms\Components\Placeholder::make('supplier_balance_info')
+                            ->label('')
                             ->content(function (Get $get) {
                                 $supplierId = $get('supplier_id');
                                 if (!$supplierId) {
-                                    return 'Seleccione un proveedor';
+                                    return '';
                                 }
 
                                 $supplier = Supplier::find($supplierId);
                                 if (!$supplier) {
-                                    return 'Proveedor no encontrado';
+                                    return '';
                                 }
 
-                                $currency = $supplier->payment_currency === 'USDT' ? 'USDT (Dólares Tether)' : 'NIO (Córdobas)';
                                 $balance = number_format($supplier->balance, 2);
 
                                 return new \Illuminate\Support\HtmlString(
-                                    "<div class='flex gap-4'>
-                                        <span class='px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium'>💱 {$currency}</span>
-                                        <span class='px-3 py-1 bg-green-100 text-green-800 rounded-full font-medium'>💰 Balance actual: {$balance} créditos</span>
+                                    "<div class='px-4 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800'>
+                                        <span class='text-green-700 dark:text-green-400 font-medium'>💰 Balance actual: {$balance} créditos</span>
                                     </div>"
                                 );
                             })
-                            ->visible(fn (Get $get) => !empty($get('supplier_id'))),
+                            ->visible(fn (Get $get) => !empty($get('supplier_id')))
+                            ->columnSpanFull(),
 
-                        Forms\Components\DatePicker::make('payment_date')
-                            ->label('Fecha del Pago')
-                            ->default(now())
-                            ->required()
-                            ->native(false),
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\DatePicker::make('payment_date')
+                                    ->label('Fecha del Pago')
+                                    ->default(now())
+                                    ->required()
+                                    ->native(false),
 
-                        Forms\Components\Select::make('payment_method_id')
-                            ->label('Método de Pago')
-                            ->relationship('paymentMethod', 'name')
-                            ->required()
-                            ->native(false)
-                            ->preload(),
+                                Forms\Components\Select::make('payment_method_id')
+                                    ->label('Método de Pago')
+                                    ->relationship('paymentMethod', 'name')
+                                    ->required()
+                                    ->native(false)
+                                    ->preload(),
+                            ]),
 
                         Forms\Components\TextInput::make('payment_reference')
                             ->label('Referencia de Pago')
                             ->placeholder('Ej: Transfer-12345, TxID, Cheque #678')
-                            ->maxLength(100),
-
-                        // Campo oculto para la moneda
-                        Forms\Components\Hidden::make('currency')
-                            ->dehydrated(),
+                            ->maxLength(100)
+                            ->columnSpanFull(),
 
                         Forms\Components\Grid::make(2)
                             ->schema([
-                                // 2. Monto pagado (en la moneda del proveedor)
+                                // 3. Monto pagado (en la moneda seleccionada)
                                 Forms\Components\TextInput::make('amount')
                                     ->label(function (Get $get) {
-                                        $supplierId = $get('supplier_id');
-                                        if (!$supplierId) {
-                                            return 'Monto Pagado';
-                                        }
-                                        $supplier = Supplier::find($supplierId);
-                                        $currency = $supplier?->payment_currency === 'USDT' ? 'USDT' : 'NIO';
-                                        return "Monto Pagado ({$currency})";
+                                        $currency = $get('currency');
+                                        return match($currency) {
+                                            'USDT' => 'Monto Pagado (USDT)',
+                                            'NIO' => 'Monto Pagado (NIO)',
+                                            'USD' => 'Monto Pagado (USD)',
+                                            default => 'Monto Pagado',
+                                        };
                                     })
                                     ->numeric()
                                     ->prefix(function (Get $get) {
-                                        $supplierId = $get('supplier_id');
-                                        if (!$supplierId) return '$';
-                                        $supplier = Supplier::find($supplierId);
-                                        return $supplier?->payment_currency === 'USDT' ? '$' : 'C$';
+                                        $currency = $get('currency');
+                                        return match($currency) {
+                                            'NIO' => 'C$',
+                                            default => '$',
+                                        };
                                     })
                                     ->required()
                                     ->minValue(0.01)
@@ -135,7 +137,7 @@ class ExpenseResource extends Resource
                                     ->live(onBlur: true)
                                     ->helperText('💵 Cantidad real que está pagando/depositando al proveedor'),
 
-                                // 3. Créditos recibidos (lo que se suma al balance)
+                                // 4. Créditos recibidos (lo que se suma al balance)
                                 Forms\Components\TextInput::make('credits_received')
                                     ->label('Créditos a Recibir')
                                     ->numeric()
@@ -155,16 +157,19 @@ class ExpenseResource extends Resource
                                 $supplierId = $get('supplier_id');
                                 $amount = floatval($get('amount') ?? 0);
                                 $credits = floatval($get('credits_received') ?? 0);
+                                $currency = $get('currency');
 
-                                if (!$supplierId || $amount <= 0) {
+                                if (!$supplierId || $amount <= 0 || !$currency) {
                                     return '';
                                 }
 
                                 $supplier = Supplier::find($supplierId);
                                 if (!$supplier) return '';
 
-                                $currency = $supplier->payment_currency === 'USDT' ? 'USDT' : 'NIO';
-                                $symbol = $supplier->payment_currency === 'USDT' ? '$' : 'C$';
+                                $symbol = match($currency) {
+                                    'NIO' => 'C$',
+                                    default => '$',
+                                };
                                 $newBalance = $supplier->balance + $credits;
 
                                 return new \Illuminate\Support\HtmlString(
@@ -178,7 +183,7 @@ class ExpenseResource extends Resource
                                     </div>"
                                 );
                             })
-                            ->visible(fn (Get $get) => !empty($get('supplier_id')) && floatval($get('amount') ?? 0) > 0)
+                            ->visible(fn (Get $get) => !empty($get('supplier_id')) && floatval($get('amount') ?? 0) > 0 && !empty($get('currency')))
                             ->columnSpanFull(),
 
                         Forms\Components\Textarea::make('description')

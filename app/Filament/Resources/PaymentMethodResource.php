@@ -30,7 +30,11 @@ class PaymentMethodResource extends Resource
                             ->label('Nombre del Método')
                             ->placeholder('Ej: Binance Pay, Banco LAFISE')
                             ->required()
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->disabled(fn ($record) => $record?->name === 'Créditos Servidor')
+                            ->helperText(fn ($record) => $record?->name === 'Créditos Servidor'
+                                ? '⚠️ Este método de pago del sistema no puede ser modificado'
+                                : null),
 
                         Forms\Components\Select::make('currency')
                             ->label('Moneda')
@@ -47,11 +51,13 @@ class PaymentMethodResource extends Resource
                             ->default('USD')
                             ->searchable()
                             ->required()
-                            ->native(false),
+                            ->native(false)
+                            ->disabled(fn ($record) => $record?->name === 'Créditos Servidor'),
 
                         Forms\Components\Toggle::make('is_active')
                             ->label('Activo')
-                            ->default(true),
+                            ->default(true)
+                            ->disabled(fn ($record) => $record?->name === 'Créditos Servidor'),
                     ])->columns(2),
             ]);
     }
@@ -62,7 +68,9 @@ class PaymentMethodResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Método')
-                    ->searchable(),
+                    ->searchable()
+                    ->icon(fn ($record) => $record->name === 'Créditos Servidor' ? 'heroicon-o-lock-closed' : null)
+                    ->iconColor('warning'),
                 Tables\Columns\TextColumn::make('currency')
                     ->label('Moneda')
                     ->badge()
@@ -86,8 +94,10 @@ class PaymentMethodResource extends Resource
                     }),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn ($record) => $record->name !== 'Créditos Servidor'),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn ($record) => $record->name !== 'Créditos Servidor'),
             ]);
     }
 
