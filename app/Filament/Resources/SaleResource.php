@@ -362,7 +362,7 @@ class SaleResource extends Resource
                             ->label('Productos de la Venta')
                             ->helperText('⚠️ Debe agregar al menos un producto a la venta')
                             ->schema([
-                                Forms\Components\Grid::make(5)
+                                Forms\Components\Grid::make(4)
                                     ->schema([
                                         Forms\Components\Select::make('product_id')
                                             ->label('Producto')
@@ -420,31 +420,7 @@ class SaleResource extends Resource
                                             ->numeric()
                                             ->default(1)
                                             ->minValue(1)
-                                            ->live(onBlur: true) // Actualiza al salir del campo
-                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
-                                                $price = $get('unit_price') ?? 0;
-                                                $set('total_price', $price * $state);
-                                            })
-                                            ->columnSpan(1),
-
-                                        Forms\Components\TextInput::make('unit_price')
-                                            ->label(function (Get $get) {
-                                                $packageId = $get('../../price_package_id');
-                                                $package = $packageId ? PricePackage::find($packageId) : null;
-                                                $currency = $package?->currency ?? 'USD';
-                                                return 'P. Venta (' . $currency . ')';
-                                            })
-                                            ->numeric()
-                                            ->prefix(function (Get $get) {
-                                                $packageId = $get('../../price_package_id');
-                                                $package = $packageId ? PricePackage::find($packageId) : null;
-                                                return $package?->isNIO() ? 'C$' : '$';
-                                            })
-                                            ->live(onBlur: true) // PERMITE EDITAR EL PRECIO
-                                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
-                                                $qty = $get('quantity') ?? 1;
-                                                $set('total_price', $state * $qty);
-                                            })
+                                            ->live(onBlur: true)
                                             ->columnSpan(1),
 
                                         // Precio Base USD (editable)
@@ -472,6 +448,8 @@ class SaleResource extends Resource
 
                                         // Campos ocultos para guardar precios
                                         Forms\Components\Hidden::make('total_price')
+                                            ->dehydrated(),
+                                        Forms\Components\Hidden::make('unit_price')
                                             ->dehydrated(),
                                         Forms\Components\Hidden::make('package_price')
                                             ->dehydrated(),
