@@ -25,10 +25,58 @@ class AdminPanelProvider extends PanelProvider
 {
     public function boot(): void
     {
-        // CSS Personalizado
+        // CSS Personalizado desde archivo
         FilamentView::registerRenderHook(
             PanelsRenderHook::HEAD_END,
             fn (): string => Blade::render('<link rel="stylesheet" href="{{ asset(\'css/filament-custom.css\') }}">')
+        );
+
+        // CSS Inline - Solo overflow visible (z-index manejado en filament-custom.css)
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::HEAD_END,
+            fn (): string => '<style>
+                /* Overflow visible para que dropdowns y datepickers no se corten */
+                .fi-section,
+                .fi-section-content,
+                .fi-fo-field-wrp,
+                .fi-fo-repeater,
+                .fi-ta-ctn {
+                    overflow: visible !important;
+                }
+            </style>'
+        );
+
+        // JavaScript para manejar sesión expirada
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_END,
+            fn (): string => '<script>
+                // Interceptar errores de sesión expirada
+                document.addEventListener("livewire:init", () => {
+                    Livewire.hook("request", ({ fail }) => {
+                        fail(({ status, content }) => {
+                            if (status === 419 || status === 401 || status === 403) {
+                                // Crear modal de sesión expirada
+                                const modal = document.createElement("div");
+                                modal.innerHTML = `
+                                    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999999;display:flex;align-items:center;justify-content:center;">
+                                        <div style="background:white;padding:2rem;border-radius:1rem;max-width:400px;text-align:center;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+                                            <svg style="width:64px;height:64px;margin:0 auto 1rem;color:#f59e0b;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                            </svg>
+                                            <h2 style="font-size:1.25rem;font-weight:600;color:#1f2937;margin-bottom:0.5rem;">Sesión Expirada</h2>
+                                            <p style="color:#6b7280;margin-bottom:1.5rem;">Tu sesión ha caducado por inactividad. Por favor, inicia sesión nuevamente.</p>
+                                            <button onclick="window.location.href=\'/admin/login\'" style="background:#7cbd2b;color:white;padding:0.75rem 2rem;border-radius:0.5rem;font-weight:500;border:none;cursor:pointer;">
+                                                Iniciar Sesión
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                                document.body.appendChild(modal);
+                            }
+                        });
+                    });
+                });
+            </script>'
         );
 
         // Meta tags para prevenir indexación en buscadores
@@ -40,6 +88,12 @@ class AdminPanelProvider extends PanelProvider
                 <meta name="bingbot" content="noindex, nofollow">
                 <meta name="description" content="Sistema de administración privado">
             ')
+        );
+
+        // Footer con copyright en la página de login
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
+            fn (): string => '<div class="text-center text-sm text-gray-500 dark:text-gray-400 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">© ' . date('Y') . ' NicaGSM - Todos los derechos reservados</div>'
         );
     }
 
@@ -57,13 +111,13 @@ class AdminPanelProvider extends PanelProvider
             ])
             // BRANDING
             ->brandName('NicaGSM Admin')
-            ->brandLogo(asset('images/logo.png'))
-            ->brandLogoHeight('3rem')
-            ->favicon(asset('images/favicon.png'))
+            ->favicon(asset('images/logo.png')) // Usar mismo logo para favicon
             
             // UI / UX
             ->spa()
             ->font('Poppins')
+            ->darkMode(true) // Habilitar toggle de modo oscuro en menú de usuario
+            ->globalSearch(false) // Deshabilitar búsqueda global
 
             // MENÚ LATERAL FIJO (Sin opción de colapsar)
             ->sidebarFullyCollapsibleOnDesktop(false)
@@ -74,6 +128,16 @@ class AdminPanelProvider extends PanelProvider
 
             // PERFIL DE USUARIO - Habilitar edición de perfil
             ->profile(\App\Filament\Pages\Auth\EditProfile::class)
+            ->userMenuItems([
+                'profile' => \Filament\Navigation\MenuItem::make()
+                    ->label('Mi Perfil')
+                    ->icon('heroicon-o-user-circle'),
+                'theme' => \Filament\Navigation\MenuItem::make()
+                    ->label('Cambiar Tema')
+                    ->icon('heroicon-o-moon')
+                    ->url(fn () => '#')
+                    ->hidden(),
+            ])
 
             // COMPONENTES
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')

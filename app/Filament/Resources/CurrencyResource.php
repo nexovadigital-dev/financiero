@@ -31,12 +31,13 @@ class CurrencyResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('code')
                                     ->label('Código')
-                                    ->placeholder('USD, EUR, NIO')
+                                    ->placeholder('USD, EUR, NIO, USDT')
                                     ->required()
-                                    ->maxLength(3)
+                                    ->maxLength(10)
                                     ->unique(ignoreRecord: true)
                                     ->afterStateUpdated(fn ($state, $set) => $set('code', strtoupper($state)))
-                                    ->live(onBlur: true),
+                                    ->live(onBlur: true)
+                                    ->helperText('Códigos: USD, NIO, EUR, USDT, etc.'),
 
                                 Forms\Components\TextInput::make('name')
                                     ->label('Nombre')

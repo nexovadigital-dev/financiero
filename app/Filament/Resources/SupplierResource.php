@@ -16,10 +16,10 @@ class SupplierResource extends Resource
     protected static ?string $model = Supplier::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-truck';
-    protected static ?string $navigationLabel = 'Proveedores';
+    protected static ?string $navigationLabel = 'Gestión de Proveedores';
     protected static ?string $modelLabel = 'Proveedor';
-    protected static ?string $navigationGroup = 'Gestión';
-    protected static ?int $navigationSort = 3;
+    protected static ?string $navigationGroup = 'Proveedores';
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -37,13 +37,35 @@ class SupplierResource extends Resource
 
                         Forms\Components\TextInput::make('website')
                             ->label('Sitio Web')
-                            ->url()
                             ->suffixIcon('heroicon-m-globe-alt')
-                            ->placeholder('https://ejemplo.com')
+                            ->placeholder('fusion.com')
+                            ->helperText('Ingrese solo el dominio (ej: fusion.com)')
                             ->maxLength(255)
-                            ->validationMessages([
-                                'url' => 'Debe ingresar una URL válida (ejemplo: https://google.com)',
+                            ->columnSpanFull(),
+
+                        Forms\Components\Select::make('payment_currency')
+                            ->label('Tipo de Moneda de Pago')
+                            ->options([
+                                'USDT' => '💵 USDT (Criptomoneda)',
+                                'LOCAL' => '💰 Moneda Local',
                             ])
+                            ->default('LOCAL')
+                            ->required()
+                            ->helperText('Seleccione en qué moneda paga a este proveedor')
+                            ->columnSpanFull(),
+
+                        Forms\Components\TextInput::make('balance')
+                            ->label(fn ($record) => $record ? 'Balance Invertido Actual' : 'Balance Inicial')
+                            ->prefix('$')
+                            ->numeric()
+                            ->default(0)
+                            ->step(0.01)
+                            ->minValue(0)
+                            ->disabled(fn ($record) => $record !== null) // Solo editable al crear
+                            ->dehydrated(fn ($record) => $record === null) // Solo guardar al crear
+                            ->helperText(fn ($record) => $record
+                                ? 'Balance se actualiza automáticamente con Pagos y Ventas de Créditos.'
+                                : 'Si ya tiene dinero depositado con este proveedor, ingrese el saldo disponible.')
                             ->columnSpanFull(),
                     ])->columns(1), // Una sola columna para que se vea limpio
             ]);
@@ -63,10 +85,86 @@ class SupplierResource extends Resource
                     ->label('Sitio Web')
                     ->icon('heroicon-m-link')
                     ->color('info')
-                    ->url(fn ($state) => $state, true) // Hace clicable el link (abre en nueva pestaña)
+                    ->url(fn ($state) => $state ? (str_starts_with($state, 'http') ? $state : 'https://' . $state) : null, true)
                     ->searchable(),
+
+                Tables\Columns\TextColumn::make('payment_currency')
+                    ->label('Tipo de Pago')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'USDT' => 'success',
+                        'LOCAL' => 'info',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'USDT' => '💵 USDT',
+                        'LOCAL' => '💰 Local',
+                        default => $state,
+                    })
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('balance')
+                    ->label('Balance Invertido')
+                    ->money('USD')
+                    ->sortable()
+                    ->color(fn ($state) => $state > 0 ? 'success' : ($state < 0 ? 'danger' : 'gray'))
+                    ->weight('bold')
+                    ->description('Pagos - Créditos usados'),
             ])
             ->actions([
+                Tables\Actions\Action::make('adjust_balance')
+                    ->label('Ajustar Balance')
+                    ->icon('heroicon-o-adjustments-horizontal')
+                    ->color('warning')
+                    ->form([
+                        Forms\Components\TextInput::make('adjustment')
+                            ->label('Monto del Ajuste (USD)')
+                            ->prefix('$')
+                            ->numeric()
+                            ->required()
+                            ->step(0.01)
+                            ->helperText('Ingrese monto positivo para AUMENTAR balance, o negativo para REDUCIR'),
+
+                        Forms\Components\Textarea::make('reason')
+                            ->label('Motivo del Ajuste')
+                            ->required()
+                            ->rows(3)
+                            ->helperText('Explique por qué está ajustando el balance (para auditoría)'),
+                    ])
+                    ->action(function (Supplier $record, array $data) {
+                        $oldBalance = $record->balance;
+                        $adjustment = floatval($data['adjustment']);
+
+                        // Ajustar balance
+                        if ($adjustment > 0) {
+                            $record->addToBalance($adjustment);
+                        } else {
+                            $record->subtractFromBalance(abs($adjustment));
+                        }
+
+                        // Log detallado para auditoría
+                        \Log::info('⚖️ Ajuste manual de balance de proveedor', [
+                            'supplier_id' => $record->id,
+                            'supplier_name' => $record->name,
+                            'old_balance' => $oldBalance,
+                            'adjustment' => $adjustment,
+                            'new_balance' => $record->fresh()->balance,
+                            'reason' => $data['reason'],
+                            'user_id' => auth()->id(),
+                        ]);
+
+                        Notification::make()
+                            ->success()
+                            ->title('Balance Ajustado')
+                            ->body("Balance de {$record->name} actualizado: \${$oldBalance} → \$" . number_format($record->fresh()->balance, 2))
+                            ->send();
+                    })
+                    ->requiresConfirmation()
+                    ->modalHeading('Ajustar Balance del Proveedor')
+                    ->modalDescription(fn (Supplier $record) =>
+                        "Balance actual: $" . number_format($record->balance, 2) . " USD"
+                    ),
+
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make()
                     ->before(function (Tables\Actions\DeleteAction $action, Supplier $record) {

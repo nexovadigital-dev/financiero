@@ -3,16 +3,25 @@
 namespace App\Filament\Resources\ClientResource\Pages;
 
 use App\Filament\Resources\ClientResource;
+use App\Filament\Pages\ApiSettings;
 use App\Models\Client;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 use Automattic\WooCommerce\Client as WooClient;
 use Filament\Notifications\Notification;
 use Filament\Forms\Components\TextInput;
+use Livewire\Attributes\On;
 
 class ListClients extends ListRecords
 {
     protected static string $resource = ClientResource::class;
+
+    // Propiedades para el progreso
+    public bool $isImporting = false;
+    public int $importProgress = 0;
+    public int $importTotal = 0;
+    public int $importedCount = 0;
+    public string $importStatus = '';
 
     protected function getHeaderActions(): array
     {
@@ -21,14 +30,14 @@ class ListClients extends ListRecords
                 ->label('Nuevo Cliente Local'),
 
             Actions\ActionGroup::make([
-                // 1. IMPORTACIÓN MASIVA (Ahora con Bucle Infinito hasta terminar)
+                // 1. IMPORTACIÓN MASIVA CON PROGRESO
                 Actions\Action::make('syncAll')
                     ->label('Importar Todos')
                     ->icon('heroicon-o-users')
                     ->color('warning')
                     ->requiresConfirmation()
                     ->modalHeading('Importación Completa')
-                    ->modalDescription('El sistema recorrerá página por página toda tu tienda WooCommerce para descargar absolutamente todos los clientes. Esto puede tomar unos minutos si son miles.')
+                    ->modalDescription('El sistema recorrerá página por página toda tu tienda WooCommerce para descargar absolutamente todos los clientes. Verás el progreso en tiempo real.')
                     ->action(fn () => $this->syncWooClients(null)),
 
                 // 2. BUSCADOR ESPECÍFICO
@@ -57,29 +66,53 @@ class ListClients extends ListRecords
 
     public function syncWooClients($searchTerm = null)
     {
-        if (!env('WOO_URL') || !env('WOO_KEY')) {
-            Notification::make()->title('Error: Faltan credenciales en .env')->danger()->send();
+        $wooUrl = ApiSettings::getWooUrl();
+        $wooKey = ApiSettings::getWooKey();
+        $wooSecret = ApiSettings::getWooSecret();
+
+        if (!$wooUrl || !$wooKey || !$wooSecret) {
+            Notification::make()
+                ->title('Error: Faltan credenciales de WooCommerce')
+                ->body('Configura las credenciales en Configuración > Configuración API')
+                ->danger()
+                ->send();
             return;
         }
 
         try {
             $woocommerce = new WooClient(
-                env('WOO_URL'),
-                env('WOO_KEY'),
-                env('WOO_SECRET'),
-                ['version' => 'wc/v3', 'verify_ssl' => false, 'timeout' => 60] // Aumentamos timeout
+                $wooUrl,
+                $wooKey,
+                $wooSecret,
+                ['version' => 'wc/v3', 'verify_ssl' => false, 'timeout' => 60]
             );
+
+            // Iniciar estado de importación
+            $this->isImporting = true;
+            $this->importProgress = 0;
+            $this->importedCount = 0;
+            $this->importStatus = 'Obteniendo total de clientes...';
+
+            // Obtener el total de clientes primero
+            $totalResponse = $woocommerce->get('customers', ['per_page' => 1, 'role' => 'all']);
+
+            // WooCommerce devuelve el total en los headers, pero como fallback contamos páginas
+            $this->importTotal = 0;
+
+            // Notificación de inicio
+            Notification::make()
+                ->title('Iniciando importación')
+                ->body('Procesando clientes de WooCommerce...')
+                ->info()
+                ->send();
 
             $page = 1;
             $count = 0;
             $keepFetching = true;
 
-            // Notificación de inicio
-            Notification::make()->title('Iniciando sincronización...')->info()->send();
-
             // --- BUCLE DE PAGINACIÓN ---
             while ($keepFetching) {
-                
+
                 $params = [
                     'per_page' => 100,
                     'page' => $page
@@ -91,6 +124,8 @@ class ListClients extends ListRecords
                     $params['role'] = 'all';
                 }
 
+                $this->importStatus = "Descargando página {$page}...";
+
                 // Pedimos los datos a la API
                 $customers = $woocommerce->get('customers', $params);
 
@@ -100,9 +135,12 @@ class ListClients extends ListRecords
                     break;
                 }
 
+                $customersInPage = count($customers);
+                $processedInPage = 0;
+
                 foreach ($customers as $customer) {
                     if (!empty($customer->email)) {
-                        
+
                         $fullName = trim($customer->first_name . ' ' . $customer->last_name);
                         if (empty($fullName)) {
                             $fullName = $customer->username;
@@ -118,35 +156,65 @@ class ListClients extends ListRecords
                             ]
                         );
                         $count++;
+                        $processedInPage++;
                     }
                 }
 
-                // Si es una búsqueda específica, probablemente no necesitemos paginar más allá de 100
-                // pero si es masivo, seguimos a la siguiente página.
+                $this->importedCount = $count;
+                $this->importStatus = "Página {$page} completada: {$count} clientes importados";
+
+                // Notificación de progreso cada 500 clientes
+                if ($count % 500 === 0 && $count > 0) {
+                    Notification::make()
+                        ->title("Progreso: {$count} clientes")
+                        ->body("Página {$page} procesada...")
+                        ->info()
+                        ->duration(2000)
+                        ->send();
+                }
+
                 if ($searchTerm) {
-                    $keepFetching = false; // En búsquedas, paramos tras la primera página de resultados
+                    $keepFetching = false;
                 } else {
-                    // Si recibimos menos de 100, significa que era la última página
                     if (count($customers) < 100) {
                         $keepFetching = false;
                     } else {
-                        $page++; // Siguiente página
+                        $page++;
                     }
                 }
             }
 
+            // Finalizar
+            $this->isImporting = false;
+            $this->importProgress = 100;
+            $this->importStatus = "Completado: {$count} clientes importados";
+
             Notification::make()
-                ->title('Proceso Finalizado')
-                ->body("Se han sincronizado un total de {$count} clientes.")
+                ->title('¡Importación Completada!')
+                ->body("Se han sincronizado {$count} clientes de WooCommerce correctamente.")
                 ->success()
+                ->persistent()
                 ->send();
 
+            // Refrescar la tabla
+            $this->dispatch('$refresh');
+
         } catch (\Exception $e) {
+            $this->isImporting = false;
+            $this->importStatus = 'Error: ' . $e->getMessage();
+
             Notification::make()
                 ->title('Error de API')
                 ->body($e->getMessage())
                 ->danger()
+                ->persistent()
                 ->send();
         }
+    }
+
+    // Vista personalizada con barra de progreso
+    protected function getHeaderWidgets(): array
+    {
+        return [];
     }
 }

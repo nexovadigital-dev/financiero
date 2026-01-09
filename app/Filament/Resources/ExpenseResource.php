@@ -4,7 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ExpenseResource\Pages;
 use App\Models\Expense;
-use App\Models\Currency;
+use App\Models\Supplier;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -18,8 +18,9 @@ class ExpenseResource extends Resource
     protected static ?string $model = Expense::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
-    protected static ?string $navigationLabel = 'Pagos a Proveedores'; // <--- AQUÍ ESTABA EL ERROR
-    protected static ?string $modelLabel = 'Pago / Egreso';
+    protected static ?string $navigationLabel = 'Pagos a Proveedores';
+    protected static ?string $modelLabel = 'Pago a Proveedor';
+    protected static ?string $pluralModelLabel = 'Pagos a Proveedores';
     protected static ?string $navigationGroup = 'Gestión';
     protected static ?int $navigationSort = 4;
 
@@ -27,142 +28,181 @@ class ExpenseResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Registrar Salida de Dinero')
+                Forms\Components\Section::make('Registrar Pago a Proveedor')
+                    ->description('Seleccione el proveedor, el tipo de pago y los créditos que recibirá.')
                     ->schema([
-                        // Selector de Proveedor con Creación Rápida
-                        Forms\Components\Select::make('supplier_id')
-                            ->label('Proveedor')
-                            ->relationship('supplier', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->createOptionForm([
-                                Forms\Components\TextInput::make('name')
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                // 1. Selector de Proveedor
+                                Forms\Components\Select::make('supplier_id')
+                                    ->label('Proveedor')
+                                    ->options(function () {
+                                        return Supplier::all()->mapWithKeys(function ($supplier) {
+                                            $balance = number_format($supplier->balance, 2);
+                                            return [$supplier->id => "{$supplier->name} - Balance: {$balance}"];
+                                        });
+                                    })
                                     ->required()
-                                    ->label('Nombre Proveedor'),
-                                Forms\Components\TextInput::make('website')
-                                    ->label('Sitio Web')
-                                    ->url(),
-                            ])
-                            ->required(),
+                                    ->native(false)
+                                    ->preload()
+                                    ->live()
+                                    ->helperText('Seleccione el proveedor al que realizará el pago'),
 
-                        Forms\Components\DatePicker::make('payment_date')
-                            ->label('Fecha del Pago')
-                            ->default(now())
-                            ->required(),
+                                // 2. Tipo de Pago (moneda)
+                                Forms\Components\Select::make('currency')
+                                    ->label('Tipo de Pago')
+                                    ->options([
+                                        'USDT' => '💵 USDT Cripto (Binance/Tether)',
+                                        'NIO' => '🇳🇮 Transferencia Nicaragua (Córdobas NIO)',
+                                        'USD' => '💲 Transferencia Nicaragua (Dólares USD)',
+                                    ])
+                                    ->required()
+                                    ->native(false)
+                                    ->live()
+                                    ->helperText('Seleccione cómo realizará el pago'),
+                            ]),
 
-                        Forms\Components\Select::make('payment_method_id')
-                            ->label('Método de Pago')
-                            ->relationship('paymentMethod', 'name')
-                            ->required()
-                            ->native(false),
+                        // Mostrar balance actual del proveedor
+                        Forms\Components\Placeholder::make('supplier_balance_info')
+                            ->label('')
+                            ->content(function (Get $get) {
+                                $supplierId = $get('supplier_id');
+                                if (!$supplierId) {
+                                    return '';
+                                }
 
-                        Forms\Components\TextInput::make('payment_reference')
-                            ->label('Referencia de Pago')
-                            ->placeholder('Ej: Transfer-12345, Cheque #678')
-                            ->maxLength(100),
+                                $supplier = Supplier::find($supplierId);
+                                if (!$supplier) {
+                                    return '';
+                                }
+
+                                $balance = number_format($supplier->balance, 2);
+
+                                return new \Illuminate\Support\HtmlString(
+                                    "<div class='px-4 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800'>
+                                        <span class='text-green-700 dark:text-green-400 font-medium'>💰 Balance actual: {$balance} créditos</span>
+                                    </div>"
+                                );
+                            })
+                            ->visible(fn (Get $get) => !empty($get('supplier_id')))
+                            ->columnSpanFull(),
 
                         Forms\Components\Grid::make(2)
                             ->schema([
-                                Forms\Components\Select::make('currency')
-                                    ->label('Moneda')
-                                    ->options(function () {
-                                        return Currency::where('is_active', true)
-                                            ->get()
-                                            ->mapWithKeys(function ($currency) {
-                                                return [$currency->code => $currency->code . ' - ' . $currency->name];
-                                            });
-                                    })
-                                    ->default('USD')
-                                    ->live()
-                                    ->afterStateUpdated(function (Get $get, Set $set, $state) {
-                                        $currency = Currency::where('code', $state)->first();
-                                        if (!$currency) {
-                                            return;
-                                        }
-
-                                        $amount = floatval($get('amount') ?? 0);
-
-                                        if ($currency->is_base) {
-                                            $set('amount_usd', $amount);
-                                            $set('exchange_rate_used', 1.000000);
-                                        } else {
-                                            $set('exchange_rate_used', $currency->exchange_rate);
-                                            if ($amount > 0) {
-                                                $set('amount_usd', $currency->convertToUSD($amount));
-                                            }
-                                        }
-
-                                        $set('manually_converted', false);
-                                    })
+                                Forms\Components\DatePicker::make('payment_date')
+                                    ->label('Fecha del Pago')
+                                    ->default(now())
                                     ->required()
                                     ->native(false),
 
+                                Forms\Components\Select::make('payment_method_id')
+                                    ->label('Método de Pago')
+                                    ->relationship('paymentMethod', 'name')
+                                    ->required()
+                                    ->native(false)
+                                    ->preload(),
+                            ]),
+
+                        Forms\Components\TextInput::make('payment_reference')
+                            ->label('Referencia de Pago')
+                            ->placeholder('Ej: Transfer-12345, TxID, Cheque #678')
+                            ->maxLength(100)
+                            ->columnSpanFull(),
+
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                // 3. Monto pagado (en la moneda seleccionada)
                                 Forms\Components\TextInput::make('amount')
-                                    ->label('Monto Pagado')
+                                    ->label(function (Get $get) {
+                                        $currency = $get('currency');
+                                        return match($currency) {
+                                            'USDT' => 'Monto Pagado (USDT)',
+                                            'NIO' => 'Monto Pagado (NIO)',
+                                            'USD' => 'Monto Pagado (USD)',
+                                            default => 'Monto Pagado',
+                                        };
+                                    })
                                     ->numeric()
-                                    ->prefix('$')
+                                    ->prefix(function (Get $get) {
+                                        $currency = $get('currency');
+                                        return match($currency) {
+                                            'NIO' => 'C$',
+                                            default => '$',
+                                        };
+                                    })
                                     ->required()
                                     ->minValue(0.01)
                                     ->step(0.01)
                                     ->placeholder('0.00')
                                     ->live(onBlur: true)
-                                    ->afterStateUpdated(function (Get $get, Set $set, $state) {
-                                        $set('manually_converted', true);
+                                    ->helperText('💵 Cantidad real que está pagando/depositando al proveedor'),
 
-                                        $currency = Currency::where('code', $get('currency'))->first();
-                                        if ($currency && $state > 0) {
-                                            $amountUSD = $currency->convertToUSD(floatval($state));
-                                            $set('amount_usd', $amountUSD);
-                                            $set('exchange_rate_used', $currency->exchange_rate);
-                                        }
-                                    })
-                                    ->helperText('💡 Editable: Puede ajustar el monto manualmente')
-                                    ->validationMessages([
-                                        'min' => 'El monto debe ser mayor a 0.',
-                                    ]),
+                                // 4. Créditos recibidos (lo que se suma al balance)
+                                Forms\Components\TextInput::make('credits_received')
+                                    ->label('Créditos a Recibir')
+                                    ->numeric()
+                                    ->prefix('⭐')
+                                    ->required()
+                                    ->minValue(0)
+                                    ->step(0.01)
+                                    ->placeholder('0.00')
+                                    ->live(onBlur: true)
+                                    ->helperText('💳 Créditos que se sumarán al balance del proveedor'),
                             ]),
 
-                        Forms\Components\Placeholder::make('conversion_info')
-                            ->label('Información de Conversión')
+                        // Información del resultado
+                        Forms\Components\Placeholder::make('result_info')
+                            ->label('')
                             ->content(function (Get $get) {
-                                $currency = $get('currency');
+                                $supplierId = $get('supplier_id');
                                 $amount = floatval($get('amount') ?? 0);
-                                $amountUSD = floatval($get('amount_usd') ?? 0);
-                                $exchangeRate = floatval($get('exchange_rate_used') ?? 0);
+                                $credits = floatval($get('credits_received') ?? 0);
+                                $currency = $get('currency');
 
-                                if ($currency === 'USD') {
-                                    return '✓ Moneda base (USD)';
+                                if (!$supplierId || $amount <= 0 || !$currency) {
+                                    return '';
                                 }
 
-                                if ($amountUSD > 0 && $exchangeRate > 0) {
-                                    return sprintf(
-                                        '%s %s = $%.2f USD (Tasa: %.2f)',
-                                        number_format($amount, 2),
-                                        $currency,
-                                        $amountUSD,
-                                        $exchangeRate
-                                    );
-                                }
+                                $supplier = Supplier::find($supplierId);
+                                if (!$supplier) return '';
 
-                                return 'Seleccione moneda para ver conversión';
-                            }),
+                                $symbol = match($currency) {
+                                    'NIO' => 'C$',
+                                    default => '$',
+                                };
+                                $newBalance = $supplier->balance + $credits;
 
-                        Forms\Components\Hidden::make('amount_usd')
-                            ->dehydrated(),
-
-                        Forms\Components\Hidden::make('exchange_rate_used')
-                            ->dehydrated(),
-
-                        Forms\Components\Hidden::make('manually_converted')
-                            ->default(false)
-                            ->dehydrated(),
+                                return new \Illuminate\Support\HtmlString(
+                                    "<div class='p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border'>
+                                        <p class='font-semibold mb-2'>📊 Resumen de la operación:</p>
+                                        <ul class='text-sm space-y-1'>
+                                            <li>💸 <strong>Gasto registrado:</strong> {$symbol}" . number_format($amount, 2) . " {$currency}</li>
+                                            <li>⭐ <strong>Créditos a recibir:</strong> " . number_format($credits, 2) . "</li>
+                                            <li>📈 <strong>Nuevo balance:</strong> " . number_format($newBalance, 2) . " créditos</li>
+                                        </ul>
+                                    </div>"
+                                );
+                            })
+                            ->visible(fn (Get $get) => !empty($get('supplier_id')) && floatval($get('amount') ?? 0) > 0 && !empty($get('currency')))
+                            ->columnSpanFull(),
 
                         Forms\Components\Textarea::make('description')
                             ->label('Concepto / Detalle')
                             ->placeholder('Describe el motivo del pago...')
-                            ->rows(3)
+                            ->rows(2)
                             ->maxLength(1000)
                             ->columnSpanFull(),
+
+                        // Campos ocultos para compatibilidad
+                        Forms\Components\Hidden::make('amount_usd')
+                            ->dehydrated()
+                            ->default(0),
+                        Forms\Components\Hidden::make('exchange_rate_used')
+                            ->dehydrated()
+                            ->default(1),
+                        Forms\Components\Hidden::make('manually_converted')
+                            ->dehydrated()
+                            ->default(false),
                     ])->columns(2),
             ]);
     }
@@ -175,38 +215,48 @@ class ExpenseResource extends Resource
                     ->label('Fecha')
                     ->date('d/m/Y')
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('supplier.name')
                     ->label('Proveedor')
                     ->weight('bold')
+                    ->description(fn ($record) => $record->supplier?->payment_currency === 'USDT' ? '💵 USDT' : '🇳🇮 NIO')
                     ->searchable(),
+
+                Tables\Columns\TextColumn::make('amount')
+                    ->label('Monto Pagado')
+                    ->formatStateUsing(function ($record) {
+                        $symbol = $record->currency === 'USDT' ? '$' : 'C$';
+                        return $symbol . number_format($record->amount, 2) . ' ' . ($record->currency ?? '');
+                    })
+                    ->color('danger'),
+
+                Tables\Columns\TextColumn::make('credits_received')
+                    ->label('Créditos')
+                    ->formatStateUsing(fn ($state) => '⭐ ' . number_format($state ?? 0, 2))
+                    ->color('success'),
+
+                Tables\Columns\TextColumn::make('paymentMethod.name')
+                    ->label('Vía')
+                    ->badge(),
 
                 Tables\Columns\TextColumn::make('description')
                     ->label('Concepto')
-                    ->limit(30),
-
-                Tables\Columns\TextColumn::make('amount')
-                    ->label('Monto')
-                    ->money(fn ($record) => $record->currency)
-                    ->color('danger')
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('paymentMethod.name')
-                    ->label('Vía de Pago')
-                    ->badge(),
+                    ->limit(25)
+                    ->toggleable(),
             ])
             ->defaultSort('payment_date', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('supplier')
                     ->relationship('supplier', 'name')
-                    ->label('Proveedor'),
+                    ->label('Proveedor')
+                    ->preload(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make()
                     ->requiresConfirmation()
                     ->modalHeading('Eliminar Pago')
-                    ->modalDescription('¿Está seguro que desea eliminar este pago? Esta acción no se puede deshacer.')
+                    ->modalDescription('¿Está seguro que desea eliminar este pago? Los créditos se revertirán del balance del proveedor.')
                     ->modalSubmitActionLabel('Sí, eliminar'),
             ])
             ->bulkActions([
@@ -214,7 +264,7 @@ class ExpenseResource extends Resource
                     Tables\Actions\DeleteBulkAction::make()
                         ->requiresConfirmation()
                         ->modalHeading('Eliminar Pagos Seleccionados')
-                        ->modalDescription('¿Está seguro que desea eliminar los pagos seleccionados? Esta acción no se puede deshacer.')
+                        ->modalDescription('¿Está seguro? Los créditos se revertirán de los balances.')
                         ->modalSubmitActionLabel('Sí, eliminar todos'),
                 ]),
             ]);

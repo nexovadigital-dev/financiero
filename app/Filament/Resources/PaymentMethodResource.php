@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PaymentMethodResource\Pages;
 use App\Models\PaymentMethod;
+use App\Models\Currency;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -29,21 +30,34 @@ class PaymentMethodResource extends Resource
                             ->label('Nombre del Método')
                             ->placeholder('Ej: Binance Pay, Banco LAFISE')
                             ->required()
-                            ->maxLength(255),
-                            
+                            ->maxLength(255)
+                            ->disabled(fn ($record) => $record?->name === 'Créditos Servidor')
+                            ->helperText(fn ($record) => $record?->name === 'Créditos Servidor'
+                                ? '⚠️ Este método de pago del sistema no puede ser modificado'
+                                : null),
+
                         Forms\Components\Select::make('currency')
                             ->label('Moneda')
-                            ->options([
-                                'USD' => 'Dólares (USD)',
-                                'NIO' => 'Córdobas (NIO)',
-                                'EUR' => 'Euros (EUR)',
-                            ])
+                            ->options(function () {
+                                // Cargar monedas activas desde la BD
+                                return Currency::where('is_active', true)
+                                    ->orderByDesc('is_base')
+                                    ->orderBy('code')
+                                    ->get()
+                                    ->mapWithKeys(function ($currency) {
+                                        return [$currency->code => $currency->symbol . ' ' . $currency->name . ' (' . $currency->code . ')'];
+                                    });
+                            })
                             ->default('USD')
-                            ->required(),
-                            
+                            ->searchable()
+                            ->required()
+                            ->native(false)
+                            ->disabled(fn ($record) => $record?->name === 'Créditos Servidor'),
+
                         Forms\Components\Toggle::make('is_active')
                             ->label('Activo')
-                            ->default(true),
+                            ->default(true)
+                            ->disabled(fn ($record) => $record?->name === 'Créditos Servidor'),
                     ])->columns(2),
             ]);
     }
@@ -54,21 +68,36 @@ class PaymentMethodResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Método')
-                    ->searchable(),
+                    ->searchable()
+                    ->icon(fn ($record) => $record->name === 'Créditos Servidor' ? 'heroicon-o-lock-closed' : null)
+                    ->iconColor('warning'),
                 Tables\Columns\TextColumn::make('currency')
                     ->label('Moneda')
                     ->badge()
-                    ->color('info'),
+                    ->color(fn ($state) => match($state) {
+                        'USD' => 'success',
+                        'NIO' => 'warning',
+                        'USDT' => 'info',
+                        'EUR' => 'primary',
+                        default => 'gray',
+                    }),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Estado')
                     ->boolean(),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('currency')
+                    ->label('Moneda')
+                    ->options(function () {
+                        return Currency::where('is_active', true)
+                            ->pluck('name', 'code');
+                    }),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->visible(fn ($record) => $record->name !== 'Créditos Servidor'),
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn ($record) => $record->name !== 'Créditos Servidor'),
             ]);
     }
 

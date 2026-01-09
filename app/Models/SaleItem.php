@@ -12,15 +12,30 @@ class SaleItem extends Model
     protected $fillable = [
         'sale_id',
         'product_id',
+        'product_name', // Nombre guardado para historial aunque se elimine el producto
         'quantity',
         'unit_price',
+        'base_price',
+        'base_price_nio', // Precio en NIO para reportes al banco (solo proveedor Moneda Local)
+        'package_price',
         'total_price',
         'metadata_values',
     ];
 
+    /**
+     * Obtener el nombre del producto (usar product_name guardado o fallback a relación)
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        return $this->product_name ?? $this->product?->name ?? 'Producto eliminado';
+    }
+
     protected $casts = [
         'metadata_values' => 'array',
         'unit_price' => 'decimal:2',
+        'base_price' => 'decimal:2',
+        'base_price_nio' => 'decimal:2',
+        'package_price' => 'decimal:2',
         'total_price' => 'decimal:2',
     ];
 

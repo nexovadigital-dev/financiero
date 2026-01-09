@@ -25,80 +25,66 @@
    CORRECCIONES DE LAYOUT Y Z-INDEX
    ================================== */
 
-/* JERARQUÍA DE Z-INDEX:
-   - Widgets/Cards: 1
-   - Formularios: 500-600
-   - Dropdowns/Modales: 999999
+/* IMPORTANTE: NO modificar z-index de formularios y campos
+   porque crea stacking contexts que interfieren con modales.
+   Solo definir z-index para elementos superpuestos:
+   - Dropdowns/Datepickers: 50
+   - Modal: 40 (Filament default)
+   - Notificaciones: 200
 */
 
-/* Widgets y estadísticas - NIVEL MÁS BAJO */
-.fi-wi,
-.fi-wi-stats-overview,
-.fi-wi-stats-overview-stat,
-.fi-page-header-widgets,
-.fi-page-header-ctn {
-    z-index: 1 !important;
-}
-
-/* Formularios - NIVEL MEDIO */
-.fi-fo {
-    z-index: 500 !important;
-}
-
-.fi-fo-section {
-    margin-bottom: 2rem !important;
-    z-index: 500 !important;
-}
-
-.fi-section-content-ctn {
-    z-index: 500 !important;
-}
-
-.fi-fo .fi-grid {
-    z-index: 500 !important;
-}
-
-/* Campos de formulario */
-.fi-fo-field-wrp {
-    z-index: 600 !important;
-}
-
-.fi-fo-field-wrp select,
-.fi-select-button,
-.fi-input-wrp {
-    z-index: 600 !important;
-}
-
-/* DROPDOWNS - NIVEL MÁS ALTO */
+/* DROPDOWNS Y DATEPICKERS - Solo estos necesitan z-index */
 div[role="listbox"],
 ul[role="listbox"],
+[role="listbox"],
 [data-fi-select-options],
 .fi-select-options,
-[x-data*="select"] > div[role="listbox"],
-[x-data*="select"] .fi-select-list,
 .fi-fo-select-options-container,
 .fi-dropdown-panel,
 .choices__list--dropdown,
 .fi-select-dropdown,
-[x-data*="select"] ul,
-[x-data] [role="menu"],
-[x-data] [role="listbox"] {
-    z-index: 999999 !important;
+[role="menu"] {
+    z-index: 50 !important;
+    background: white !important;
 }
 
-/* Calendarios */
+.dark div[role="listbox"],
+.dark ul[role="listbox"],
+.dark [role="listbox"],
+.dark .fi-dropdown-panel,
+.dark [role="menu"] {
+    background: #1f2937 !important;
+}
+
+/* Datepickers de Filament (Alpine.js) */
+.fi-fo-date-time-picker [x-ref="panel"] {
+    z-index: 50 !important;
+    background: white !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2) !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+.dark .fi-fo-date-time-picker [x-ref="panel"] {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+}
+
+/* Calendarios Flatpickr */
 .flatpickr-calendar,
 .flatpickr-months,
 .flatpickr-innerContainer {
-    z-index: 999999 !important;
+    z-index: 50 !important;
 }
 
-/* Modales de confirmación */
-.fi-modal,
-.fi-modal-window,
-[role="dialog"],
-[role="alertdialog"] {
-    z-index: 999999 !important;
+/* NOTIFICACIONES - Siempre visibles por encima de todo */
+.fi-notification {
+    z-index: 200 !important;
+}
+
+/* Espaciado de secciones de formulario */
+.fi-fo-section {
+    margin-bottom: 2rem !important;
 }
 
 /* ==================================
