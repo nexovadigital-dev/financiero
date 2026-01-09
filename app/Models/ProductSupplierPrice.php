@@ -10,13 +10,15 @@ class ProductSupplierPrice extends Model
     protected $fillable = [
         'product_id',
         'supplier_id',
-        'base_price',
-        'base_price_nio', // Precio en córdobas para reportes al banco (solo Moneda Local)
+        'base_price',        // Precio Base USDT (costo en créditos)
+        'base_price_nio',    // Precio Base NIO (córdobas para banco)
+        'base_price_usd_nic', // Precio Base USD Nicaragua (dólares para banco)
     ];
 
     protected $casts = [
         'base_price' => 'decimal:2',
         'base_price_nio' => 'decimal:2',
+        'base_price_usd_nic' => 'decimal:2',
     ];
 
     /**

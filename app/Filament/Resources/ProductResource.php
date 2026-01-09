@@ -134,14 +134,14 @@ class ProductResource extends Resource
                                             ->live(),
 
                                         Forms\Components\TextInput::make('base_price')
-                                            ->label('Precio Base (USD)')
+                                            ->label('Precio Base (USDT)')
                                             ->numeric()
                                             ->prefix('$')
                                             ->default(0)
                                             ->minValue(0)
                                             ->step(0.01)
                                             ->required()
-                                            ->helperText('Costo en créditos USD'),
+                                            ->helperText('Costo en créditos USDT'),
 
                                         Forms\Components\TextInput::make('base_price_nio')
                                             ->label('Precio Base (NIO)')
@@ -151,6 +151,15 @@ class ProductResource extends Resource
                                             ->minValue(0)
                                             ->step(0.01)
                                             ->helperText('Precio en Córdobas para exportación al banco'),
+
+                                        Forms\Components\TextInput::make('base_price_usd_nic')
+                                            ->label('Precio Base (USD-Nicaragua)')
+                                            ->numeric()
+                                            ->prefix('$')
+                                            ->default(null)
+                                            ->minValue(0)
+                                            ->step(0.01)
+                                            ->helperText('Precio en Dólares Nicaragua para exportación al banco'),
                                     ]),
                             ])
                             ->defaultItems(0)
@@ -158,9 +167,12 @@ class ProductResource extends Resource
                             ->collapsible()
                             ->itemLabel(function (array $state): ?string {
                                 $supplier = \App\Models\Supplier::find($state['supplier_id']);
-                                $label = $supplier?->name . ' - $' . number_format($state['base_price'] ?? 0, 2) . ' USD';
-                                if ($supplier?->payment_currency === 'LOCAL' && ($state['base_price_nio'] ?? 0) > 0) {
+                                $label = $supplier?->name . ' - $' . number_format($state['base_price'] ?? 0, 2) . ' USDT';
+                                if (($state['base_price_nio'] ?? 0) > 0) {
                                     $label .= ' / C$' . number_format($state['base_price_nio'], 2) . ' NIO';
+                                }
+                                if (($state['base_price_usd_nic'] ?? 0) > 0) {
+                                    $label .= ' / $' . number_format($state['base_price_usd_nic'], 2) . ' USD-Nic';
                                 }
                                 return $label;
                             })

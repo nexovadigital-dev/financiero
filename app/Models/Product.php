@@ -101,7 +101,7 @@ class Product extends Model
 
     /**
      * Obtener el precio base en NIO para un proveedor específico
-     * Solo aplica para el proveedor "Moneda Local"
+     * Para exportación al banco en córdobas
      */
     public function getBasePriceNioForSupplier(?int $supplierId): ?float
     {
@@ -114,6 +114,23 @@ class Product extends Model
             ->first();
 
         return $supplierPrice?->base_price_nio;
+    }
+
+    /**
+     * Obtener el precio base en USD Nicaragua para un proveedor específico
+     * Para exportación al banco en dólares Nicaragua
+     */
+    public function getBasePriceUsdNicForSupplier(?int $supplierId): ?float
+    {
+        if (!$supplierId) {
+            return null;
+        }
+
+        $supplierPrice = $this->supplierPrices()
+            ->where('supplier_id', $supplierId)
+            ->first();
+
+        return $supplierPrice?->base_price_usd_nic;
     }
 
     /**
