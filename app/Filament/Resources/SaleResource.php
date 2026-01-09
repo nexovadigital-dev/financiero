@@ -397,13 +397,15 @@ class SaleResource extends Resource
                                                         $packagePrice = $product->price;
                                                     }
 
-                                                    // 4. Obtener precio base según el PROVEEDOR seleccionado
+                                                    // 4. Obtener precios base según el PROVEEDOR seleccionado
                                                     $basePrice = $product->getBasePriceForSupplier($supplierId);
                                                     $basePriceNio = $product->getBasePriceNioForSupplier($supplierId);
+                                                    $basePriceUsdNic = $product->getBasePriceUsdNicForSupplier($supplierId);
 
                                                     // 5. Guardar precios
-                                                    $set('base_price', $basePrice); // Precio que se debita del proveedor (USD)
-                                                    $set('base_price_nio', $basePriceNio ?? 0); // Precio en NIO para reportes
+                                                    $set('base_price', $basePrice); // Precio USDT (créditos)
+                                                    $set('base_price_nio', $basePriceNio ?? 0); // Precio NIO para banco
+                                                    $set('base_price_usd_nic', $basePriceUsdNic ?? 0); // Precio USD-Nic para banco
                                                     $set('package_price', $packagePrice); // Precio que se cobra al cliente
                                                     $set('unit_price', $packagePrice); // Para compatibilidad
 
@@ -423,9 +425,9 @@ class SaleResource extends Resource
                                             ->live(onBlur: true)
                                             ->columnSpan(1),
 
-                                        // Precio Base USD (editable)
+                                        // Precio Base USDT (editable)
                                         Forms\Components\TextInput::make('base_price')
-                                            ->label('Costo USD')
+                                            ->label('Costo USDT')
                                             ->numeric()
                                             ->prefix('$')
                                             ->step(0.01)
@@ -443,6 +445,18 @@ class SaleResource extends Resource
                                             ->minValue(0)
                                             ->dehydrated()
                                             ->extraInputAttributes(['style' => 'background-color: #dbeafe; color: #1e40af; font-weight: bold;'])
+                                            ->visible(fn (Get $get) => $get('../../currency') === 'NIO')
+                                            ->columnSpan(1),
+
+                                        // Precio Base USD Nicaragua (editable, solo visible cuando moneda es NIO)
+                                        Forms\Components\TextInput::make('base_price_usd_nic')
+                                            ->label('Costo USD-Nic')
+                                            ->numeric()
+                                            ->prefix('$')
+                                            ->step(0.01)
+                                            ->minValue(0)
+                                            ->dehydrated()
+                                            ->extraInputAttributes(['style' => 'background-color: #d1fae5; color: #065f46; font-weight: bold;'])
                                             ->visible(fn (Get $get) => $get('../../currency') === 'NIO')
                                             ->columnSpan(1),
 
