@@ -448,7 +448,7 @@ class SaleResource extends Resource
                                             ->visible(fn (Get $get) => $get('../../currency') === 'NIO')
                                             ->columnSpan(1),
 
-                                        // Precio Base USD Nicaragua (editable, solo visible cuando moneda es NIO)
+                                        // Precio Base USD Nicaragua (visible cuando moneda es NIO o banco Nicaragua USD)
                                         Forms\Components\TextInput::make('base_price_usd_nic')
                                             ->label('Costo USD-Nic')
                                             ->numeric()
@@ -457,7 +457,21 @@ class SaleResource extends Resource
                                             ->minValue(0)
                                             ->dehydrated()
                                             ->extraInputAttributes(['style' => 'background-color: #d1fae5; color: #065f46; font-weight: bold;'])
-                                            ->visible(fn (Get $get) => $get('../../currency') === 'NIO')
+                                            ->visible(function (Get $get) {
+                                                $currency = $get('../../currency');
+                                                if ($currency === 'NIO') {
+                                                    return true;
+                                                }
+                                                // Mostrar también para bancos Nicaragua USD
+                                                $paymentMethodId = $get('../../payment_method_id');
+                                                if ($paymentMethodId) {
+                                                    $paymentMethod = \App\Models\PaymentMethod::find($paymentMethodId);
+                                                    if ($paymentMethod && str_contains(strtolower($paymentMethod->name), 'nicaragua')) {
+                                                        return true;
+                                                    }
+                                                }
+                                                return false;
+                                            })
                                             ->columnSpan(1),
 
                                         // Campos ocultos para guardar precios
