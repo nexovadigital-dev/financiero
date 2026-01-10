@@ -58,7 +58,13 @@ class ProductResource extends Resource
 
         $fields = [];
         foreach ($packages as $package) {
-            $fieldName = 'price_package_' . $package->sort_order;
+            // Usar el ID del paquete (1-4) para mapear al campo correcto en products
+            $packageId = $package->id;
+            if ($packageId < 1 || $packageId > 4) {
+                continue; // Solo soportamos 4 paquetes (price_package_1 a price_package_4)
+            }
+
+            $fieldName = 'price_package_' . $packageId;
             $fields[] = Forms\Components\TextInput::make($fieldName)
                 ->label("📦 {$package->name}")
                 ->numeric()

@@ -24,12 +24,44 @@ class CreateSale extends CreateRecord
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Agregar product_name a cada item para histórico
+        // Verificar si es una venta con banco Nicaragua USD
+        $isNicaraguaUsdBank = false;
+        if (!empty($data['payment_method_id'])) {
+            $paymentMethod = PaymentMethod::find($data['payment_method_id']);
+            if ($paymentMethod && str_contains(strtolower($paymentMethod->name), 'nicaragua')) {
+                $isNicaraguaUsdBank = true;
+            }
+        }
+
+        // Agregar product_name y asegurar precios a cada item
         if (isset($data['items']) && is_array($data['items'])) {
             foreach ($data['items'] as $key => $item) {
                 if (!empty($item['product_id'])) {
                     $product = Product::find($item['product_id']);
                     $data['items'][$key]['product_name'] = $product?->name ?? 'Producto desconocido';
+
+                    // Asegurar que base_price_usd_nic tenga valor
+                    if (!isset($data['items'][$key]['base_price_usd_nic']) || $data['items'][$key]['base_price_usd_nic'] === null) {
+                        $supplierId = $data['supplier_id'] ?? null;
+                        $data['items'][$key]['base_price_usd_nic'] = $product?->getBasePriceUsdNicForSupplier($supplierId) ?? 0;
+                    }
+
+                    // Asegurar que base_price_nio tenga valor
+                    if (!isset($data['items'][$key]['base_price_nio']) || $data['items'][$key]['base_price_nio'] === null) {
+                        $supplierId = $data['supplier_id'] ?? null;
+                        $data['items'][$key]['base_price_nio'] = $product?->getBasePriceNioForSupplier($supplierId) ?? 0;
+                    }
+
+                    // Si es banco Nicaragua USD, usar el precio USD-Nic como costo principal
+                    if ($isNicaraguaUsdBank) {
+                        $usdNicPrice = floatval($data['items'][$key]['base_price_usd_nic'] ?? 0);
+                        if ($usdNicPrice > 0) {
+                            // Guardar el USDT original en un campo temporal para referencia
+                            $data['items'][$key]['base_price_usdt_original'] = $data['items'][$key]['base_price'];
+                            // Usar USD-Nic como el costo principal
+                            $data['items'][$key]['base_price'] = $usdNicPrice;
+                        }
+                    }
                 }
             }
         }
