@@ -20,6 +20,12 @@ class Product extends Model
         'price_package_2',
         'price_package_3',
         'price_package_4',
+        'price_package_5',
+        'price_package_6',
+        'price_package_7',
+        'price_package_8',
+        'price_package_9',
+        'price_package_10',
         'type',
         'required_metadata',
         'woocommerce_product_id',
@@ -35,6 +41,12 @@ class Product extends Model
         'price_package_2' => 'decimal:2',
         'price_package_3' => 'decimal:2',
         'price_package_4' => 'decimal:2',
+        'price_package_5' => 'decimal:2',
+        'price_package_6' => 'decimal:2',
+        'price_package_7' => 'decimal:2',
+        'price_package_8' => 'decimal:2',
+        'price_package_9' => 'decimal:2',
+        'price_package_10' => 'decimal:2',
         'is_active' => 'boolean',
     ];
 
@@ -44,10 +56,16 @@ class Product extends Model
     public function getPriceForPackage(int $packageId): float
     {
         return match($packageId) {
-            1 => $this->price_package_1,
-            2 => $this->price_package_2,
-            3 => $this->price_package_3,
-            4 => $this->price_package_4,
+            1 => $this->price_package_1 ?? 0,
+            2 => $this->price_package_2 ?? 0,
+            3 => $this->price_package_3 ?? 0,
+            4 => $this->price_package_4 ?? 0,
+            5 => $this->price_package_5 ?? 0,
+            6 => $this->price_package_6 ?? 0,
+            7 => $this->price_package_7 ?? 0,
+            8 => $this->price_package_8 ?? 0,
+            9 => $this->price_package_9 ?? 0,
+            10 => $this->price_package_10 ?? 0,
             default => 0,
         };
     }
