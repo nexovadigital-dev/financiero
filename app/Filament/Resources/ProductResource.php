@@ -58,10 +58,10 @@ class ProductResource extends Resource
 
         $fields = [];
         foreach ($packages as $package) {
-            // Usar el ID del paquete (1-4) para mapear al campo correcto en products
+            // Usar el ID del paquete para mapear al campo correcto en products (soporta hasta 10)
             $packageId = $package->id;
-            if ($packageId < 1 || $packageId > 4) {
-                continue; // Solo soportamos 4 paquetes (price_package_1 a price_package_4)
+            if ($packageId < 1 || $packageId > 10) {
+                continue; // Soportamos hasta 10 paquetes (price_package_1 a price_package_10)
             }
 
             $fieldName = 'price_package_' . $packageId;
