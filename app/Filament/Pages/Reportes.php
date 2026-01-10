@@ -438,9 +438,19 @@ class Reportes extends Page implements HasForms, HasTable
                             'COP' => 'COP ',
                             default => $currency . ' ',
                         };
-                        // Si NO es USD/USDT, convertir base_price (USD) a la moneda de la venta
-                        $cost = $record->items->sum(function ($item) use ($currency, $record) {
-                            // Si es USD o USDT, no convertir
+
+                        // Detectar si el método de pago es de Nicaragua USD
+                        $isNicaraguaUsd = false;
+                        if ($record->paymentMethod) {
+                            $isNicaraguaUsd = str_contains(strtolower($record->paymentMethod->name), 'nicaragua');
+                        }
+
+                        $cost = $record->items->sum(function ($item) use ($currency, $record, $isNicaraguaUsd) {
+                            // Si es método de pago Nicaragua USD, usar base_price_usd_nic
+                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                                return $item->base_price_usd_nic * $item->quantity;
+                            }
+                            // Si es USD o USDT (y NO es Nicaragua), usar base_price
                             if (in_array($currency, ['USD', 'USDT'])) {
                                 return ($item->base_price ?? 0) * $item->quantity;
                             }
@@ -458,7 +468,18 @@ class Reportes extends Page implements HasForms, HasTable
                     ->color('warning')
                     ->getStateUsing(function ($record) {
                         $currency = $record->currency ?? 'USD';
-                        return $record->items->sum(function ($item) use ($currency, $record) {
+
+                        // Detectar si el método de pago es de Nicaragua USD
+                        $isNicaraguaUsd = false;
+                        if ($record->paymentMethod) {
+                            $isNicaraguaUsd = str_contains(strtolower($record->paymentMethod->name), 'nicaragua');
+                        }
+
+                        return $record->items->sum(function ($item) use ($currency, $record, $isNicaraguaUsd) {
+                            // Si es método de pago Nicaragua USD, usar base_price_usd_nic
+                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                                return $item->base_price_usd_nic * $item->quantity;
+                            }
                             if (in_array($currency, ['USD', 'USDT'])) {
                                 return ($item->base_price ?? 0) * $item->quantity;
                             }
@@ -482,9 +503,19 @@ class Reportes extends Page implements HasForms, HasTable
                             'COP' => 'COP ',
                             default => $currency . ' ',
                         };
+
+                        // Detectar si el método de pago es de Nicaragua USD
+                        $isNicaraguaUsd = false;
+                        if ($record->paymentMethod) {
+                            $isNicaraguaUsd = str_contains(strtolower($record->paymentMethod->name), 'nicaragua');
+                        }
+
                         $total = $record->total_amount;
-                        // Si NO es USD/USDT, convertir base_price (USD) a la moneda de la venta
-                        $cost = $record->items->sum(function ($item) use ($currency, $record) {
+                        $cost = $record->items->sum(function ($item) use ($currency, $record, $isNicaraguaUsd) {
+                            // Si es método de pago Nicaragua USD, usar base_price_usd_nic
+                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                                return $item->base_price_usd_nic * $item->quantity;
+                            }
                             if (in_array($currency, ['USD', 'USDT'])) {
                                 return ($item->base_price ?? 0) * $item->quantity;
                             }
@@ -502,8 +533,19 @@ class Reportes extends Page implements HasForms, HasTable
                     ->color('success')
                     ->getStateUsing(function ($record) {
                         $currency = $record->currency ?? 'USD';
+
+                        // Detectar si el método de pago es de Nicaragua USD
+                        $isNicaraguaUsd = false;
+                        if ($record->paymentMethod) {
+                            $isNicaraguaUsd = str_contains(strtolower($record->paymentMethod->name), 'nicaragua');
+                        }
+
                         $total = $record->total_amount;
-                        $cost = $record->items->sum(function ($item) use ($currency, $record) {
+                        $cost = $record->items->sum(function ($item) use ($currency, $record, $isNicaraguaUsd) {
+                            // Si es método de pago Nicaragua USD, usar base_price_usd_nic
+                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                                return $item->base_price_usd_nic * $item->quantity;
+                            }
                             if (in_array($currency, ['USD', 'USDT'])) {
                                 return ($item->base_price ?? 0) * $item->quantity;
                             }
@@ -554,10 +596,20 @@ class Reportes extends Page implements HasForms, HasTable
             ->when(! empty($this->filters['client_id']), fn ($q) => $q->where('client_id', $this->filters['client_id']))
             ->where('status', 'completed')
             ->whereNull('refunded_at')
-            ->with('items')
+            ->with(['items', 'paymentMethod'])
             ->get()
             ->sum(function ($sale) use ($currency) {
-                return $sale->items->sum(function ($item) use ($currency, $sale) {
+                // Detectar si el método de pago es de Nicaragua USD
+                $isNicaraguaUsd = false;
+                if ($sale->paymentMethod) {
+                    $isNicaraguaUsd = str_contains(strtolower($sale->paymentMethod->name), 'nicaragua');
+                }
+
+                return $sale->items->sum(function ($item) use ($currency, $sale, $isNicaraguaUsd) {
+                    // Si es método de pago Nicaragua USD, usar base_price_usd_nic
+                    if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                        return $item->base_price_usd_nic * $item->quantity;
+                    }
                     if (in_array($currency, ['USD', 'USDT'])) {
                         return ($item->base_price ?? 0) * $item->quantity;
                     }
@@ -587,12 +639,22 @@ class Reportes extends Page implements HasForms, HasTable
             ->when(! empty($this->filters['client_id']), fn ($q) => $q->where('client_id', $this->filters['client_id']))
             ->where('status', 'completed')
             ->whereNull('refunded_at')
-            ->with('items')
+            ->with(['items', 'paymentMethod'])
             ->get();
 
         return $sales->sum(function ($sale) use ($currency) {
+            // Detectar si el método de pago es de Nicaragua USD
+            $isNicaraguaUsd = false;
+            if ($sale->paymentMethod) {
+                $isNicaraguaUsd = str_contains(strtolower($sale->paymentMethod->name), 'nicaragua');
+            }
+
             $total = $sale->total_amount;
-            $cost = $sale->items->sum(function ($item) use ($currency, $sale) {
+            $cost = $sale->items->sum(function ($item) use ($currency, $sale, $isNicaraguaUsd) {
+                // Si es método de pago Nicaragua USD, usar base_price_usd_nic
+                if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                    return $item->base_price_usd_nic * $item->quantity;
+                }
                 if (in_array($currency, ['USD', 'USDT'])) {
                     return ($item->base_price ?? 0) * $item->quantity;
                 }

@@ -52,22 +52,29 @@ class Product extends Model
 
     /**
      * Obtener el precio según el paquete seleccionado
+     * Usa mapeo dinámico: el precio se obtiene según el índice del paquete en la lista ordenada,
+     * no según su ID (esto permite tener paquetes con IDs mayores a 10)
      */
     public function getPriceForPackage(int $packageId): float
     {
-        return match($packageId) {
-            1 => $this->price_package_1 ?? 0,
-            2 => $this->price_package_2 ?? 0,
-            3 => $this->price_package_3 ?? 0,
-            4 => $this->price_package_4 ?? 0,
-            5 => $this->price_package_5 ?? 0,
-            6 => $this->price_package_6 ?? 0,
-            7 => $this->price_package_7 ?? 0,
-            8 => $this->price_package_8 ?? 0,
-            9 => $this->price_package_9 ?? 0,
-            10 => $this->price_package_10 ?? 0,
-            default => 0,
-        };
+        // Obtener todos los paquetes activos ordenados
+        $packages = \App\Models\PricePackage::where('is_active', true)
+            ->orderBy('sort_order')
+            ->pluck('id')
+            ->toArray();
+
+        // Buscar el índice del paquete solicitado
+        $index = array_search($packageId, $packages);
+
+        // Si no se encuentra el paquete o el índice es >= 10, devolver 0
+        if ($index === false || $index >= 10) {
+            return 0;
+        }
+
+        // Mapear el índice (0-9) al campo correspondiente (price_package_1 a price_package_10)
+        $fieldName = 'price_package_' . ($index + 1);
+
+        return $this->{$fieldName} ?? 0;
     }
 
     /**
