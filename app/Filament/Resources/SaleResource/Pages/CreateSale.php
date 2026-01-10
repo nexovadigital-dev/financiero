@@ -51,6 +51,17 @@ class CreateSale extends CreateRecord
                         $supplierId = $data['supplier_id'] ?? null;
                         $data['items'][$key]['base_price_nio'] = $product?->getBasePriceNioForSupplier($supplierId) ?? 0;
                     }
+
+                    // Si es banco Nicaragua USD, usar el precio USD-Nic como costo principal
+                    if ($isNicaraguaUsdBank) {
+                        $usdNicPrice = floatval($data['items'][$key]['base_price_usd_nic'] ?? 0);
+                        if ($usdNicPrice > 0) {
+                            // Guardar el USDT original en un campo temporal para referencia
+                            $data['items'][$key]['base_price_usdt_original'] = $data['items'][$key]['base_price'];
+                            // Usar USD-Nic como el costo principal
+                            $data['items'][$key]['base_price'] = $usdNicPrice;
+                        }
+                    }
                 }
             }
         }
