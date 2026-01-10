@@ -1,5 +1,19 @@
 # Guía de Administración del Sistema
 
+## ⚠️ Importante: Problemas de Sesión con Cloudflare
+
+Si experimentas que el sistema se queda cargando después de 10-20 segundos de inactividad y necesitas hacer F5, **lee la guía de configuración de Cloudflare**:
+
+📄 **[CLOUDFLARE_CPANEL_SETUP.md](CLOUDFLARE_CPANEL_SETUP.md)** - Guía completa para configurar Cloudflare + cPanel
+
+Esta guía incluye:
+- Configuración de sesiones extendidas
+- Reglas de Cloudflare para evitar problemas de cache
+- Configuración de PHP en cPanel
+- Solución de problemas comunes
+
+---
+
 ## Panel de Administración del Sistema
 
 Este proyecto incluye un panel de administración especial para realizar operaciones de mantenimiento sin necesidad de acceso SSH.
