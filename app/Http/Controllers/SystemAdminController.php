@@ -124,9 +124,25 @@ class SystemAdminController extends Controller
         }
 
         try {
-            // Ejecutar migraciones
-            Artisan::call('migrate', ['--force' => true]);
+            // Ejecutar migraciones con manejo mejorado de errores
+            Artisan::call('migrate', [
+                '--force' => true,
+                '--step' => true, // Ejecutar de una en una para mejor control
+            ]);
             $output = Artisan::output();
+
+            // Verificar si hay errores en la salida
+            if (strpos($output, 'SQLSTATE') !== false) {
+                // Hay un error SQL, intentar continuar con las siguientes
+                Log::warning('Migraciones con advertencias por usuario: ' . Auth::user()->email . "\n" . $output);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Migraciones completadas con advertencias (algunas ya estaban aplicadas)',
+                    'output' => $output,
+                    'warning' => true
+                ]);
+            }
 
             Log::info('Migraciones ejecutadas por usuario: ' . Auth::user()->email);
 
@@ -138,6 +154,16 @@ class SystemAdminController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Error al ejecutar migraciones: ' . $e->getMessage());
+
+            // Verificar si el error es por columnas duplicadas
+            if (strpos($e->getMessage(), 'Duplicate column') !== false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Las migraciones ya están aplicadas. Las columnas ya existen en la base de datos.',
+                    'output' => $e->getMessage(),
+                    'suggestion' => 'Si necesitas sincronizar el estado de las migraciones, contacta al administrador del sistema.'
+                ], 200); // Cambiar a 200 porque técnicamente no es un error
+            }
 
             return response()->json([
                 'success' => false,

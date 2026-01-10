@@ -204,20 +204,48 @@
                 const data = await response.json();
 
                 if (data.success) {
+                    // Mostrar con advertencia si hay warnings
+                    const colorClass = data.warning ? 'yellow' : 'green';
+                    const iconClass = data.warning ? 'exclamation-triangle' : 'check-circle';
+
                     resultDiv.innerHTML = `
-                        <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                        <div class="bg-${colorClass}-50 border-l-4 border-${colorClass}-500 p-4 rounded">
                             <div class="flex items-start">
-                                <i class="fas fa-check-circle text-green-600 mt-1 mr-3"></i>
-                                <div>
-                                    <h3 class="text-green-800 font-bold mb-1">${data.message}</h3>
-                                    <pre class="text-sm text-green-700 mt-2 bg-green-100 p-3 rounded overflow-x-auto">${data.output}</pre>
+                                <i class="fas fa-${iconClass} text-${colorClass}-600 mt-1 mr-3"></i>
+                                <div class="w-full">
+                                    <h3 class="text-${colorClass}-800 font-bold mb-1">${data.message}</h3>
+                                    <pre class="text-sm text-${colorClass}-700 mt-2 bg-${colorClass}-100 p-3 rounded overflow-x-auto">${data.output}</pre>
                                 </div>
                             </div>
                         </div>
                     `;
                     document.getElementById('securityToken').value = '';
                 } else {
-                    throw new Error(data.message);
+                    // Mostrar mensaje de error con sugerencia si existe
+                    let errorHtml = `
+                        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded">
+                            <div class="flex items-start">
+                                <i class="fas fa-info-circle text-yellow-600 mt-1 mr-3"></i>
+                                <div class="w-full">
+                                    <h3 class="text-yellow-800 font-bold mb-1">${data.message}</h3>
+                    `;
+
+                    if (data.output) {
+                        errorHtml += `<pre class="text-sm text-yellow-700 mt-2 bg-yellow-100 p-3 rounded overflow-x-auto max-h-40">${data.output}</pre>`;
+                    }
+
+                    if (data.suggestion) {
+                        errorHtml += `<p class="text-sm text-yellow-700 mt-2"><strong>Sugerencia:</strong> ${data.suggestion}</p>`;
+                    }
+
+                    errorHtml += `
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    resultDiv.innerHTML = errorHtml;
+                    document.getElementById('securityToken').value = '';
                 }
             } catch (error) {
                 resultDiv.innerHTML = `

@@ -13,12 +13,25 @@ return new class extends Migration
     {
         Schema::table('products', function (Blueprint $table) {
             // Agregar columnas para más paquetes de precios (5-10)
-            $table->decimal('price_package_5', 10, 2)->nullable()->after('price_package_4');
-            $table->decimal('price_package_6', 10, 2)->nullable()->after('price_package_5');
-            $table->decimal('price_package_7', 10, 2)->nullable()->after('price_package_6');
-            $table->decimal('price_package_8', 10, 2)->nullable()->after('price_package_7');
-            $table->decimal('price_package_9', 10, 2)->nullable()->after('price_package_8');
-            $table->decimal('price_package_10', 10, 2)->nullable()->after('price_package_9');
+            // Verificar si las columnas ya existen antes de agregarlas
+            if (!Schema::hasColumn('products', 'price_package_5')) {
+                $table->decimal('price_package_5', 10, 2)->nullable()->after('price_package_4');
+            }
+            if (!Schema::hasColumn('products', 'price_package_6')) {
+                $table->decimal('price_package_6', 10, 2)->nullable()->after('price_package_5');
+            }
+            if (!Schema::hasColumn('products', 'price_package_7')) {
+                $table->decimal('price_package_7', 10, 2)->nullable()->after('price_package_6');
+            }
+            if (!Schema::hasColumn('products', 'price_package_8')) {
+                $table->decimal('price_package_8', 10, 2)->nullable()->after('price_package_7');
+            }
+            if (!Schema::hasColumn('products', 'price_package_9')) {
+                $table->decimal('price_package_9', 10, 2)->nullable()->after('price_package_8');
+            }
+            if (!Schema::hasColumn('products', 'price_package_10')) {
+                $table->decimal('price_package_10', 10, 2)->nullable()->after('price_package_9');
+            }
         });
     }
 
