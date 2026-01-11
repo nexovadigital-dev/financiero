@@ -446,19 +446,19 @@ class Reportes extends Page implements HasForms, HasTable
                         }
 
                         $cost = $record->items->sum(function ($item) use ($currency, $record, $isNicaraguaUsd) {
-                            // Si es método de pago Nicaragua USD, usar base_price_usd_nic
-                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
-                                return $item->base_price_usd_nic * $item->quantity;
-                            }
-                            // Si es USD o USDT (y NO es Nicaragua), usar base_price
-                            if (in_array($currency, ['USD', 'USDT'])) {
-                                return ($item->base_price ?? 0) * $item->quantity;
-                            }
-                            // Para NIO, preferir base_price_nio si existe
+                            // PRIORIDAD 1: Si la moneda es NIO, SIEMPRE usar base_price_nio
                             if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
                                 return $item->base_price_nio * $item->quantity;
                             }
-                            // Para cualquier otra moneda, convertir base_price (USD) usando tasa de cambio
+                            // PRIORIDAD 2: Si es método de pago Nicaragua USD (y NO es NIO), usar base_price_usd_nic
+                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                                return $item->base_price_usd_nic * $item->quantity;
+                            }
+                            // PRIORIDAD 3: Si es USD o USDT, usar base_price
+                            if (in_array($currency, ['USD', 'USDT'])) {
+                                return ($item->base_price ?? 0) * $item->quantity;
+                            }
+                            // FALLBACK: Para cualquier otra moneda, convertir base_price usando tasa de cambio
                             $basePriceUsd = $item->base_price ?? 0;
                             $exchangeRate = $record->exchange_rate_used ?? 1;
                             return ($basePriceUsd * $exchangeRate) * $item->quantity;
@@ -476,16 +476,19 @@ class Reportes extends Page implements HasForms, HasTable
                         }
 
                         return $record->items->sum(function ($item) use ($currency, $record, $isNicaraguaUsd) {
-                            // Si es método de pago Nicaragua USD, usar base_price_usd_nic
-                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
-                                return $item->base_price_usd_nic * $item->quantity;
-                            }
-                            if (in_array($currency, ['USD', 'USDT'])) {
-                                return ($item->base_price ?? 0) * $item->quantity;
-                            }
+                            // PRIORIDAD 1: Si la moneda es NIO, SIEMPRE usar base_price_nio
                             if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
                                 return $item->base_price_nio * $item->quantity;
                             }
+                            // PRIORIDAD 2: Si es método de pago Nicaragua USD (y NO es NIO), usar base_price_usd_nic
+                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                                return $item->base_price_usd_nic * $item->quantity;
+                            }
+                            // PRIORIDAD 3: Si es USD o USDT, usar base_price
+                            if (in_array($currency, ['USD', 'USDT'])) {
+                                return ($item->base_price ?? 0) * $item->quantity;
+                            }
+                            // FALLBACK: Para cualquier otra moneda, convertir base_price usando tasa de cambio
                             $basePriceUsd = $item->base_price ?? 0;
                             $exchangeRate = $record->exchange_rate_used ?? 1;
                             return ($basePriceUsd * $exchangeRate) * $item->quantity;
@@ -512,16 +515,19 @@ class Reportes extends Page implements HasForms, HasTable
 
                         $total = $record->total_amount;
                         $cost = $record->items->sum(function ($item) use ($currency, $record, $isNicaraguaUsd) {
-                            // Si es método de pago Nicaragua USD, usar base_price_usd_nic
-                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
-                                return $item->base_price_usd_nic * $item->quantity;
-                            }
-                            if (in_array($currency, ['USD', 'USDT'])) {
-                                return ($item->base_price ?? 0) * $item->quantity;
-                            }
+                            // PRIORIDAD 1: Si la moneda es NIO, SIEMPRE usar base_price_nio
                             if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
                                 return $item->base_price_nio * $item->quantity;
                             }
+                            // PRIORIDAD 2: Si es método de pago Nicaragua USD (y NO es NIO), usar base_price_usd_nic
+                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                                return $item->base_price_usd_nic * $item->quantity;
+                            }
+                            // PRIORIDAD 3: Si es USD o USDT, usar base_price
+                            if (in_array($currency, ['USD', 'USDT'])) {
+                                return ($item->base_price ?? 0) * $item->quantity;
+                            }
+                            // FALLBACK: Para cualquier otra moneda, convertir base_price usando tasa de cambio
                             $basePriceUsd = $item->base_price ?? 0;
                             $exchangeRate = $record->exchange_rate_used ?? 1;
                             return ($basePriceUsd * $exchangeRate) * $item->quantity;
@@ -542,16 +548,19 @@ class Reportes extends Page implements HasForms, HasTable
 
                         $total = $record->total_amount;
                         $cost = $record->items->sum(function ($item) use ($currency, $record, $isNicaraguaUsd) {
-                            // Si es método de pago Nicaragua USD, usar base_price_usd_nic
-                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
-                                return $item->base_price_usd_nic * $item->quantity;
-                            }
-                            if (in_array($currency, ['USD', 'USDT'])) {
-                                return ($item->base_price ?? 0) * $item->quantity;
-                            }
+                            // PRIORIDAD 1: Si la moneda es NIO, SIEMPRE usar base_price_nio
                             if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
                                 return $item->base_price_nio * $item->quantity;
                             }
+                            // PRIORIDAD 2: Si es método de pago Nicaragua USD (y NO es NIO), usar base_price_usd_nic
+                            if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                                return $item->base_price_usd_nic * $item->quantity;
+                            }
+                            // PRIORIDAD 3: Si es USD o USDT, usar base_price
+                            if (in_array($currency, ['USD', 'USDT'])) {
+                                return ($item->base_price ?? 0) * $item->quantity;
+                            }
+                            // FALLBACK: Para cualquier otra moneda, convertir base_price usando tasa de cambio
                             $basePriceUsd = $item->base_price ?? 0;
                             $exchangeRate = $record->exchange_rate_used ?? 1;
                             return ($basePriceUsd * $exchangeRate) * $item->quantity;
@@ -606,16 +615,19 @@ class Reportes extends Page implements HasForms, HasTable
                 }
 
                 return $sale->items->sum(function ($item) use ($currency, $sale, $isNicaraguaUsd) {
-                    // Si es método de pago Nicaragua USD, usar base_price_usd_nic
-                    if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
-                        return $item->base_price_usd_nic * $item->quantity;
-                    }
-                    if (in_array($currency, ['USD', 'USDT'])) {
-                        return ($item->base_price ?? 0) * $item->quantity;
-                    }
+                    // PRIORIDAD 1: Si la moneda es NIO, SIEMPRE usar base_price_nio
                     if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
                         return $item->base_price_nio * $item->quantity;
                     }
+                    // PRIORIDAD 2: Si es método de pago Nicaragua USD (y NO es NIO), usar base_price_usd_nic
+                    if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                        return $item->base_price_usd_nic * $item->quantity;
+                    }
+                    // PRIORIDAD 3: Si es USD o USDT, usar base_price
+                    if (in_array($currency, ['USD', 'USDT'])) {
+                        return ($item->base_price ?? 0) * $item->quantity;
+                    }
+                    // FALLBACK: Para cualquier otra moneda, convertir base_price usando tasa de cambio
                     $basePriceUsd = $item->base_price ?? 0;
                     $exchangeRate = $sale->exchange_rate_used ?? 1;
                     return ($basePriceUsd * $exchangeRate) * $item->quantity;
@@ -651,16 +663,19 @@ class Reportes extends Page implements HasForms, HasTable
 
             $total = $sale->total_amount;
             $cost = $sale->items->sum(function ($item) use ($currency, $sale, $isNicaraguaUsd) {
-                // Si es método de pago Nicaragua USD, usar base_price_usd_nic
-                if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
-                    return $item->base_price_usd_nic * $item->quantity;
-                }
-                if (in_array($currency, ['USD', 'USDT'])) {
-                    return ($item->base_price ?? 0) * $item->quantity;
-                }
+                // PRIORIDAD 1: Si la moneda es NIO, SIEMPRE usar base_price_nio
                 if ($currency === 'NIO' && ($item->base_price_nio ?? 0) > 0) {
                     return $item->base_price_nio * $item->quantity;
                 }
+                // PRIORIDAD 2: Si es método de pago Nicaragua USD (y NO es NIO), usar base_price_usd_nic
+                if ($isNicaraguaUsd && ($item->base_price_usd_nic ?? 0) > 0) {
+                    return $item->base_price_usd_nic * $item->quantity;
+                }
+                // PRIORIDAD 3: Si es USD o USDT, usar base_price
+                if (in_array($currency, ['USD', 'USDT'])) {
+                    return ($item->base_price ?? 0) * $item->quantity;
+                }
+                // FALLBACK: Para cualquier otra moneda, convertir base_price usando tasa de cambio
                 $basePriceUsd = $item->base_price ?? 0;
                 $exchangeRate = $sale->exchange_rate_used ?? 1;
                 return ($basePriceUsd * $exchangeRate) * $item->quantity;
