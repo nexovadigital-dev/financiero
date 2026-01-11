@@ -57,14 +57,14 @@ class ProductResource extends Resource
         }
 
         $fields = [];
+        $index = 1; // Usar índice secuencial en lugar del ID
         foreach ($packages as $package) {
-            // Usar el ID del paquete para mapear al campo correcto en products (soporta hasta 10)
-            $packageId = $package->id;
-            if ($packageId < 1 || $packageId > 10) {
-                continue; // Soportamos hasta 10 paquetes (price_package_1 a price_package_10)
+            // Soportamos hasta 10 paquetes (price_package_1 a price_package_10)
+            if ($index > 10) {
+                break; // Máximo 10 paquetes
             }
 
-            $fieldName = 'price_package_' . $packageId;
+            $fieldName = 'price_package_' . $index;
             $fields[] = Forms\Components\TextInput::make($fieldName)
                 ->label("📦 {$package->name}")
                 ->numeric()
@@ -73,6 +73,8 @@ class ProductResource extends Resource
                 ->minValue(0)
                 ->step(0.01)
                 ->helperText($package->description ?? "Precio para paquete {$package->name}");
+
+            $index++; // Incrementar índice
         }
 
         return [

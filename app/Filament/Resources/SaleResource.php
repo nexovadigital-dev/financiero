@@ -723,12 +723,14 @@ class SaleResource extends Resource
             if ($productId) {
                 $product = Product::find($productId);
                 if ($product) {
-                    // Obtener precio base según el nuevo proveedor
+                    // Obtener TODOS los precios base según el nuevo proveedor
                     $basePrice = $product->getBasePriceForSupplier($supplierId);
                     $basePriceNio = $product->getBasePriceNioForSupplier($supplierId);
+                    $basePriceUsdNic = $product->getBasePriceUsdNicForSupplier($supplierId);
 
                     $item['base_price'] = $basePrice;
-                    $item['base_price_nio'] = $basePriceNio;
+                    $item['base_price_nio'] = $basePriceNio ?? 0;
+                    $item['base_price_usd_nic'] = $basePriceUsdNic ?? 0;
                 }
             }
 

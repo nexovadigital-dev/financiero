@@ -11,7 +11,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Confiar en Cloudflare para detectar IPs reales
+        $middleware->prepend(\App\Http\Middleware\TrustCloudflare::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

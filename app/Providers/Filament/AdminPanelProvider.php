@@ -132,6 +132,11 @@ class AdminPanelProvider extends PanelProvider
                 'profile' => \Filament\Navigation\MenuItem::make()
                     ->label('Mi Perfil')
                     ->icon('heroicon-o-user-circle'),
+                'system-admin' => \Filament\Navigation\MenuItem::make()
+                    ->label('Administración del Sistema')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->url('/system')
+                    ->openUrlInNewTab(false),
                 'theme' => \Filament\Navigation\MenuItem::make()
                     ->label('Cambiar Tema')
                     ->icon('heroicon-o-moon')
