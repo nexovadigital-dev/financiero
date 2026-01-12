@@ -1,59 +1,217 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sistema Financiero - NicaGSM
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistema de gestión financiera y control de gastos desarrollado por **Nexova Digital Solutions** para uso exclusivo de **NicaGSM**.
 
-## About Laravel
+## Descripción
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Aplicación web personalizada para la gestión integral de operaciones financieras, inventario y control de gastos operativos de NicaGSM. El sistema permite un control detallado de ventas, compras, proveedores, clientes y reportes financieros con soporte multi-moneda.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Características Principales
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Gestión de Ventas
+- Registro de ventas con soporte multi-moneda (USDT, USD, NIO, USD-Nicaragua)
+- Múltiples ítems por venta con costos y precios individualizados
+- Cálculo automático de ganancias y costos
+- Sistema de créditos e inversiones
+- Conversión automática de monedas en reportes
+- Ventas a crédito con seguimiento de pagos
 
-## Learning Laravel
+### Gestión de Productos
+- Catálogo de productos con información detallada
+- Hasta 10 paquetes de precios por producto
+- Precios base editables en múltiples monedas:
+  - USDT (Tether)
+  - USD (Dólar Estadounidense)
+  - USD-Nic (Dólar para bancos de Nicaragua)
+  - NIO (Córdoba Nicaragüense)
+- Precios específicos por proveedor
+- Control de costos por moneda
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### Gestión de Proveedores
+- Registro completo de proveedores
+- Seguimiento de balance por proveedor
+- Historial de pagos y compras
+- Múltiples métodos de pago por proveedor
+- Conversión automática de monedas en balances
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Sistema de Gastos
+El sistema maneja dos tipos de gastos:
 
-## Laravel Sponsors
+#### 1. Pagos a Proveedores
+- Pagos relacionados con proveedores específicos
+- Actualización automática de balance de proveedor
+- Filtros por proveedor y método de pago
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+#### 2. Gastos Operativos
+- Gastos generales de la empresa (hosting, programador, servicios externos)
+- No requieren asociación con proveedor
+- Registro con nombre personalizado y descripción
+- Detección automática de moneda según método de pago
+- Filtros por moneda y método de pago
+- Seguimiento independiente en reportes financieros
 
-### Premium Partners
+### Gestión de Clientes
+- Base de datos de clientes
+- Historial de compras por cliente
+- Seguimiento de créditos pendientes
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### Métodos de Pago
+- Configuración de múltiples métodos de pago
+- Asociación con monedas específicas
+- Activación/desactivación de métodos
+- Uso en ventas, compras y gastos operativos
 
-## Contributing
+### Reportes Financieros
+Dashboard con indicadores clave:
+- **Total Ingresos**: Suma de todas las ventas
+- **Egresos Proveedores**: Total de pagos a proveedores
+- **Gastos Operativos**: Total de gastos operativos
+- **Ganancia Neta**: Ingresos menos egresos totales
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Características de reportes:
+- Todos los indicadores en USD para consistencia
+- Conversión automática de monedas
+- Filtros por fecha, moneda y método de pago
+- Exportación de datos
+- Visualización detallada de costos
 
-## Code of Conduct
+### Soporte Multi-Moneda
+- **USDT (Tether)**: Criptomoneda estable
+- **USD**: Dólar estadounidense estándar
+- **USD-Nic**: Dólar para operaciones con bancos nicaragüenses
+- **NIO**: Córdoba nicaragüense
+- Conversión automática en reportes y balances
+- Tasas de cambio configurables
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Panel de Administración
+- Gestión de configuraciones globales
+- Tasas de cambio de monedas
+- Configuración de precios base
+- Gestión de paquetes de precios
+- Administración de usuarios
 
-## Security Vulnerabilities
+## Stack Tecnológico
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- **Framework**: Laravel 11.x
+- **Panel Admin**: Filament 3.x
+- **Base de Datos**: MySQL/MariaDB
+- **PHP**: 8.2+
+- **Frontend**: Blade + Alpine.js + Tailwind CSS
 
-## License
+## Requisitos del Sistema
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- PHP >= 8.2
+- Composer
+- MySQL >= 8.0 o MariaDB >= 10.3
+- Node.js >= 18.x (para assets)
+- Extensiones PHP requeridas:
+  - BCMath
+  - Ctype
+  - cURL
+  - DOM
+  - Fileinfo
+  - JSON
+  - Mbstring
+  - OpenSSL
+  - PCRE
+  - PDO
+  - Tokenizer
+  - XML
+
+## Instalación
+
+1. Clonar el repositorio
+```bash
+git clone https://github.com/nexovadigital-dev/financiero.git
+cd financiero
+```
+
+2. Instalar dependencias de PHP
+```bash
+composer install
+```
+
+3. Instalar dependencias de Node.js
+```bash
+npm install
+```
+
+4. Copiar el archivo de configuración
+```bash
+cp .env.example .env
+```
+
+5. Generar key de aplicación
+```bash
+php artisan key:generate
+```
+
+6. Configurar la base de datos en el archivo `.env`
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=financiero
+DB_USERNAME=tu_usuario
+DB_PASSWORD=tu_password
+```
+
+7. Ejecutar migraciones
+```bash
+php artisan migrate --seed
+```
+
+8. Compilar assets
+```bash
+npm run build
+```
+
+9. Iniciar el servidor de desarrollo
+```bash
+php artisan serve
+```
+
+## Actualizaciones Recientes
+
+### Enero 2026
+
+#### Sistema de Gastos Operativos (v1.8)
+- Nuevo módulo para gestionar gastos operativos separados de pagos a proveedores
+- Gastos operativos no afectan el balance de proveedores
+- Widget financiero actualizado con 4 estadísticas separadas
+- Migración idempotente para actualización segura
+
+#### Mejoras en Sistema de Precios (v1.7)
+- Soporte para hasta 10 paquetes de precios por producto
+- Precios base USD-Nicaragua agregados
+- Corrección de prioridad de cálculo de costos para NIO
+- Panel de administración mejorado para precios
+
+#### Optimizaciones Multi-Moneda (v1.6)
+- Corrección de conversión de costos para todas las monedas
+- Reportes financieros siempre en USD
+- Mejor manejo de bancos Nicaragua USD en ventas
+- Visualización mejorada de precios NIO
+
+#### Mejoras de Infraestructura (v1.5)
+- Solución de problemas de sesiones con cPanel + Cloudflare
+- Mejora en manejo de migraciones
+- Corrección de errores de columnas duplicadas
+
+## Soporte y Desarrollo
+
+**Desarrollado por**: Nexova Digital Solutions
+**Cliente**: NicaGSM
+**Uso**: Exclusivo para NicaGSM
+
+Para soporte o consultas sobre el sistema, contactar con el equipo de desarrollo de Nexova Digital Solutions.
+
+## Licencia
+
+Software propietario. Todos los derechos reservados por Nexova Digital Solutions.
+Uso exclusivo autorizado para NicaGSM.
+
+---
+
+**Última actualización**: Enero 2026
+**Versión**: 1.8.0
