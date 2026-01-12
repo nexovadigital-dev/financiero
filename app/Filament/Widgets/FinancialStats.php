@@ -32,15 +32,27 @@ class FinancialStats extends BaseWidget
             ->whereDate('sale_date', '<=', $endDate)
             ->sum('total_amount');
 
-        // 3. Calcular EGRESOS (Pagos a Proveedores)
-        $egresos = Expense::query()
+        // 3. Calcular EGRESOS - Pagos a Proveedores (supplier_payment)
+        $egresosProveedores = Expense::query()
             ->where('currency', $currency)
+            ->where('expense_type', 'supplier_payment')
             ->whereDate('payment_date', '>=', $startDate)
             ->whereDate('payment_date', '<=', $endDate)
             ->sum('amount');
 
-        // 4. Calcular GANANCIA NETA
-        $balance = $ingresos - $egresos;
+        // 4. Calcular GASTOS OPERATIVOS (operational)
+        $gastosOperativos = Expense::query()
+            ->where('currency', $currency)
+            ->where('expense_type', 'operational')
+            ->whereDate('payment_date', '>=', $startDate)
+            ->whereDate('payment_date', '<=', $endDate)
+            ->sum('amount');
+
+        // 5. Calcular TOTAL EGRESOS (Proveedores + Operativos)
+        $totalEgresos = $egresosProveedores + $gastosOperativos;
+
+        // 6. Calcular GANANCIA NETA
+        $balance = $ingresos - $totalEgresos;
 
         // Determinar color y mensaje según el balance
         $colorBalance = $balance >= 0 ? 'success' : 'danger';
@@ -53,11 +65,17 @@ class FinancialStats extends BaseWidget
                 ->color('success')
                 ->chart([7, 10, 12, 14, 15, 18, 20]), // Gráfica estética ascendente
 
-            Stat::make('Total Egresos', number_format($egresos, 2) . ' ' . $currency)
+            Stat::make('Egresos Proveedores', number_format($egresosProveedores, 2) . ' ' . $currency)
                 ->description('Pagos a proveedores')
                 ->descriptionIcon('heroicon-m-arrow-right-start-on-rectangle')
-                ->color('danger')
+                ->color('warning')
                 ->chart([2, 5, 3, 6, 4, 8, 5]), // Gráfica estética variable
+
+            Stat::make('Gastos Operativos', number_format($gastosOperativos, 2) . ' ' . $currency)
+                ->description('Hosting, programador, servicios')
+                ->descriptionIcon('heroicon-m-receipt-refund')
+                ->color('danger')
+                ->chart([3, 4, 3, 5, 4, 6, 5]), // Gráfica estética variable
 
             Stat::make('Ganancia Neta', number_format($balance, 2) . ' ' . $currency)
                 ->description($balance >= 0 ? 'Rentabilidad Positiva' : 'Pérdida en el periodo')

@@ -13,6 +13,8 @@ class Expense extends Model
     use HasFactory;
 
     protected $fillable = [
+        'expense_type',
+        'expense_name',
         'supplier_id',
         'payment_method_id',
         'amount',
@@ -43,5 +45,25 @@ class Expense extends Model
     public function paymentMethod()
     {
         return $this->belongsTo(PaymentMethod::class);
+    }
+
+    /**
+     * Verificar si es un gasto operativo (no pago a proveedor)
+     */
+    public function isOperational(): bool
+    {
+        return $this->expense_type === 'operational';
+    }
+
+    /**
+     * Obtener el nombre a mostrar (proveedor o nombre del gasto)
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        if ($this->isOperational()) {
+            return $this->expense_name ?? 'Gasto operativo';
+        }
+
+        return $this->supplier?->name ?? 'Proveedor eliminado';
     }
 }

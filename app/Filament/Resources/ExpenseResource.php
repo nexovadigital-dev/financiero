@@ -24,6 +24,12 @@ class ExpenseResource extends Resource
     protected static ?string $navigationGroup = 'Gestión';
     protected static ?int $navigationSort = 4;
 
+    // Filtrar solo pagos a proveedores
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->where('expense_type', 'supplier_payment');
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -194,6 +200,9 @@ class ExpenseResource extends Resource
                             ->columnSpanFull(),
 
                         // Campos ocultos para compatibilidad
+                        Forms\Components\Hidden::make('expense_type')
+                            ->default('supplier_payment')
+                            ->dehydrated(),
                         Forms\Components\Hidden::make('amount_usd')
                             ->dehydrated()
                             ->default(0),
