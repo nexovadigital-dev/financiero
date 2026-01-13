@@ -598,14 +598,11 @@ class SaleResource extends Resource
                         $count = $items->count() - 1;
                         return $firstName . " (+" . $count . " más)";
                     })
-                    ->searchable(
-                        query: function ($query, string $search) {
-                            return $query->whereHas('items', function ($q) use ($search) {
-                                $q->where('product_name', 'like', "%{$search}%");
-                            });
-                        },
-                        isIndividual: true
-                    )
+                    ->searchable(query: function ($query, string $search) {
+                        return $query->whereHas('items', function ($q) use ($search) {
+                            $q->where('product_name', 'like', "%{$search}%");
+                        });
+                    })
                     ->limit(35)
                     ->wrap()
                     ->color('info'),
@@ -699,6 +696,9 @@ class SaleResource extends Resource
             ])
             ->defaultSort('created_at', 'desc')
             ->recordClasses(fn ($record) => $record->isRefunded() ? 'opacity-50 line-through' : null)
+            ->searchable()
+            ->persistSearchInSession()
+            ->persistColumnSearchesInSession()
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->hidden(fn ($record) => $record->status === 'cancelled'),
