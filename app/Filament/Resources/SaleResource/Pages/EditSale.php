@@ -13,6 +13,9 @@ class EditSale extends EditRecord
 
     protected function getHeaderActions(): array
     {
+        // Cargar relaciones necesarias
+        $this->record->load(['supplier', 'client', 'items']);
+
         $actions = [];
 
         // BOTÓN REEMBOLSAR - Solo para ventas de créditos no reembolsadas
@@ -51,27 +54,20 @@ class EditSale extends EditRecord
 
         // BOTÓN ANULAR - Para todas las ventas que no estén canceladas
         if ($this->record->status !== 'cancelled') {
-            $actions[] = Actions\Action::make('cancel')
+            $sale = $this->record;
+            $supplierText = ($sale->supplier_id && $sale->supplier)
+                ? " Se devolverá el crédito al proveedor {$sale->supplier->name}."
+                : "";
+
+            $actions[] = Actions\Action::make('annul_sale')
                 ->label('Anular Venta')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->requiresConfirmation()
-                ->modalHeading('Anular Venta')
-                ->modalDescription(function () {
-                    $sale = $this->record;
-                    $message = "⚠️ ADVERTENCIA: Esta acción:\n\n" .
-                        "• Eliminará la ganancia de esta venta ($" . number_format($sale->amount_usd, 2) . " USD) de los reportes\n";
-
-                    if ($sale->supplier_id && $sale->supplier) {
-                        $message .= "• Devolverá el crédito al proveedor {$sale->supplier->name}\n";
-                    }
-
-                    $message .= "• Marcará la venta como Cancelada\n" .
-                        "• Esta acción NO se puede revertir\n\n" .
-                        "¿Está seguro que desea anular esta venta?";
-
-                    return $message;
-                })
+                ->modalHeading('⚠️ Anular Venta')
+                ->modalDescription(
+                    "Esta acción eliminará la ganancia de esta venta (\$" . number_format($sale->amount_usd, 2) . " USD) de los reportes.{$supplierText} La venta se marcará como Cancelada. Esta acción NO se puede revertir. ¿Está seguro?"
+                )
                 ->modalSubmitActionLabel('Sí, anular venta')
                 ->action(function () {
                     $sale = $this->record;
