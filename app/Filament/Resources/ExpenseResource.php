@@ -221,18 +221,19 @@ class ExpenseResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('payment_date')
-                    ->label('Fecha')
-                    ->date('d/m/Y')
-                    ->sortable(),
+                    ->label('Fecha Pago')
+                    ->dateTime('d/m/Y H:i')
+                    ->sortable()
+                    ->description('Fecha del pago'),
 
                 Tables\Columns\TextColumn::make('supplier.name')
                     ->label('Proveedor')
                     ->weight('bold')
-                    ->description(fn ($record) => $record->supplier?->payment_currency === 'USDT' ? '💵 USDT' : '🇳🇮 NIO')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('amount')
-                    ->label('Monto Pagado')
+                    ->label('💵 Monto Pagado')
                     ->formatStateUsing(function ($record) {
                         $symbol = match($record->currency) {
                             'USDT', 'USD' => '$',
@@ -241,26 +242,33 @@ class ExpenseResource extends Resource
                         };
                         return $symbol . number_format($record->amount, 2) . ' ' . ($record->currency ?? 'USD');
                     })
-                    ->description('Monto en su moneda original')
                     ->color('danger')
                     ->weight('bold'),
 
                 Tables\Columns\TextColumn::make('credits_received')
-                    ->label('Créditos Recibidos')
+                    ->label('💰 Créditos Recibidos')
                     ->formatStateUsing(fn ($state) => '$' . number_format($state ?? 0, 2) . ' USD')
-                    ->description('Valor en créditos USD')
                     ->color('success')
                     ->weight('bold')
-                    ->icon('heroicon-o-star'),
+                    ->icon('heroicon-o-arrow-up-circle'),
+
+                Tables\Columns\TextColumn::make('supplier.balance')
+                    ->label('📊 Balance Actual')
+                    ->formatStateUsing(fn ($state) => '$' . number_format($state ?? 0, 2) . ' USD')
+                    ->color(fn ($state) => $state >= 0 ? 'success' : 'danger')
+                    ->weight('medium')
+                    ->description('Balance actual del proveedor'),
 
                 Tables\Columns\TextColumn::make('paymentMethod.name')
                     ->label('Vía')
-                    ->badge(),
+                    ->badge()
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('description')
                     ->label('Concepto')
-                    ->limit(25)
-                    ->toggleable(),
+                    ->limit(30)
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('payment_date', 'desc')
             ->filters([

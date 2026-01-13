@@ -23,11 +23,11 @@ class SupplierCreditTransactionResource extends Resource
     protected static ?string $navigationGroup = 'Proveedores';
     protected static ?int $navigationSort = 2;
 
-    // Filtrar solo transacciones de ventas (sale_debit y sale_refund)
+    // Filtrar: ventas, reembolsos y ajustes de balance
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
         return parent::getEloquentQuery()
-            ->whereIn('type', ['sale_debit', 'sale_refund'])
+            ->whereIn('type', ['sale_debit', 'sale_refund', 'manual_adjustment'])
             ->with(['supplier', 'user', 'reference']);
     }
 
@@ -83,6 +83,24 @@ class SupplierCreditTransactionResource extends Resource
                             ->icon('heroicon-o-user'),
                     ])
                     ->columns(2),
+
+                Infolists\Components\Section::make('Detalles del Ajuste Manual')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('description')
+                            ->label('Motivo del Ajuste')
+                            ->columnSpanFull(),
+
+                        Infolists\Components\TextEntry::make('user.name')
+                            ->label('Ajustado por')
+                            ->default('Sistema')
+                            ->icon('heroicon-o-user'),
+
+                        Infolists\Components\TextEntry::make('created_at')
+                            ->label('Fecha del Ajuste')
+                            ->dateTime('d/m/Y H:i:s'),
+                    ])
+                    ->columns(2)
+                    ->visible(fn ($record) => $record->type === 'manual_adjustment'),
 
                 Infolists\Components\Section::make('Datos de la Venta')
                     ->schema([
@@ -248,7 +266,8 @@ class SupplierCreditTransactionResource extends Resource
                     ->label('Tipo de Transacción')
                     ->options([
                         'sale_debit' => '💳 Venta a Crédito',
-                        'sale_refund' => '↩️ Reembolso de Venta',
+                        'sale_refund' => '↩️ Reembolso/Anulación',
+                        'manual_adjustment' => '⚖️ Ajuste Manual',
                     ])
                     ->placeholder('Todos los tipos'),
             ])
