@@ -584,7 +584,7 @@ class SaleResource extends Resource
                     ->icon('heroicon-o-user-circle'),
 
                 // 4. Nombre del Servicio/Artículo
-                Tables\Columns\TextColumn::make('id')
+                Tables\Columns\TextColumn::make('products_list')
                     ->label('Productos')
                     ->state(function ($record) {
                         $items = $record->items;
@@ -606,7 +606,7 @@ class SaleResource extends Resource
                     ->color('info'),
 
                 // 5. Costo Base (precio base en USD)
-                Tables\Columns\TextColumn::make('id')
+                Tables\Columns\TextColumn::make('base_cost_total')
                     ->label('Costo Base')
                     ->state(function ($record) {
                         $items = $record->items;
