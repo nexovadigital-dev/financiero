@@ -586,15 +586,17 @@ class SaleResource extends Resource
                 // 4. Nombre del Servicio/Artículo
                 Tables\Columns\TextColumn::make('products_list')
                     ->label('Productos')
-                    ->state(function ($record) {
+                    ->getStateUsing(function ($record) {
                         $items = $record->items;
                         if (!$items || $items->count() === 0) return '-';
                         if ($items->count() === 1) {
-                            return $items->first()->product_name ?? '-';
+                            $item = $items->first();
+                            return $item->display_name ?? $item->product_name ?? '-';
                         }
-                        $first = $items->first()->product_name ?? 'Producto';
+                        $first = $items->first();
+                        $firstName = $first->display_name ?? $first->product_name ?? 'Producto';
                         $count = $items->count() - 1;
-                        return $first . " (+" . $count . " más)";
+                        return $firstName . " (+" . $count . " más)";
                     })
                     ->searchable(query: function ($query, $search) {
                         return $query->whereHas('items', function ($q) use ($search) {
@@ -608,7 +610,7 @@ class SaleResource extends Resource
                 // 5. Costo Base (precio base en USD)
                 Tables\Columns\TextColumn::make('base_cost_total')
                     ->label('Costo Base')
-                    ->state(function ($record) {
+                    ->getStateUsing(function ($record) {
                         $items = $record->items;
                         if (!$items || $items->count() === 0) return '$0.00 USD';
 
