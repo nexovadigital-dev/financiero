@@ -31,7 +31,12 @@ class ExpenseObserver
         }
 
         $oldBalance = $expense->supplier->balance;
-        $expense->supplier->addToBalance($creditsToAdd);
+        $expense->supplier->addToBalance(
+            amount: $creditsToAdd,
+            type: 'payment',
+            description: "Pago #{$expense->id} - {$expense->amount} {$expense->currency} → {$creditsToAdd} USD",
+            reference: $expense
+        );
 
         Log::info('💰 Balance acreditado por pago a proveedor', [
             'expense_id' => $expense->id,
@@ -63,9 +68,19 @@ class ExpenseObserver
                 $oldBalance = $expense->supplier->balance;
 
                 if ($difference > 0) {
-                    $expense->supplier->addToBalance($difference);
+                    $expense->supplier->addToBalance(
+                        amount: $difference,
+                        type: 'payment',
+                        description: "Ajuste Pago #{$expense->id} - Créditos aumentaron: {$oldCredits} → {$newCredits} USD",
+                        reference: $expense
+                    );
                 } else {
-                    $expense->supplier->subtractFromBalance(abs($difference));
+                    $expense->supplier->subtractFromBalance(
+                        amount: abs($difference),
+                        type: 'manual_adjustment',
+                        description: "Ajuste Pago #{$expense->id} - Créditos disminuyeron: {$oldCredits} → {$newCredits} USD",
+                        reference: $expense
+                    );
                 }
 
                 Log::info('🔄 Balance ajustado por modificación de pago', [
@@ -98,7 +113,12 @@ class ExpenseObserver
         }
 
         $oldBalance = $expense->supplier->balance;
-        $expense->supplier->subtractFromBalance($creditsToRemove);
+        $expense->supplier->subtractFromBalance(
+            amount: $creditsToRemove,
+            type: 'manual_adjustment',
+            description: "Eliminación Pago #{$expense->id} - Revertir {$expense->amount} {$expense->currency}",
+            reference: null
+        );
 
         Log::info('🔄 Balance revertido por eliminación de pago', [
             'expense_id' => $expense->id,

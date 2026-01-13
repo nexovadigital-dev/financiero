@@ -21,7 +21,7 @@ class ExpenseResource extends Resource
     protected static ?string $navigationLabel = 'Pagos a Proveedores';
     protected static ?string $modelLabel = 'Pago a Proveedor';
     protected static ?string $pluralModelLabel = 'Pagos a Proveedores';
-    protected static ?string $navigationGroup = 'Gestión';
+    protected static ?string $navigationGroup = 'Proveedores';
     protected static ?int $navigationSort = 4;
 
     // Filtrar solo pagos a proveedores
@@ -234,15 +234,24 @@ class ExpenseResource extends Resource
                 Tables\Columns\TextColumn::make('amount')
                     ->label('Monto Pagado')
                     ->formatStateUsing(function ($record) {
-                        $symbol = $record->currency === 'USDT' ? '$' : 'C$';
-                        return $symbol . number_format($record->amount, 2) . ' ' . ($record->currency ?? '');
+                        $symbol = match($record->currency) {
+                            'USDT', 'USD' => '$',
+                            'NIO' => 'C$',
+                            default => '$',
+                        };
+                        return $symbol . number_format($record->amount, 2) . ' ' . ($record->currency ?? 'USD');
                     })
-                    ->color('danger'),
+                    ->description('Monto en su moneda original')
+                    ->color('danger')
+                    ->weight('bold'),
 
                 Tables\Columns\TextColumn::make('credits_received')
-                    ->label('Créditos')
-                    ->formatStateUsing(fn ($state) => '⭐ ' . number_format($state ?? 0, 2))
-                    ->color('success'),
+                    ->label('Créditos Recibidos')
+                    ->formatStateUsing(fn ($state) => '$' . number_format($state ?? 0, 2) . ' USD')
+                    ->description('Valor en créditos USD')
+                    ->color('success')
+                    ->weight('bold')
+                    ->icon('heroicon-o-star'),
 
                 Tables\Columns\TextColumn::make('paymentMethod.name')
                     ->label('Vía')
