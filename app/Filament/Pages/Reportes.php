@@ -10,6 +10,8 @@ use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Pages\Page;
 use Filament\Tables;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -356,10 +358,21 @@ class Reportes extends Page implements HasForms, HasTable
             })
             ->columns([
                 Tables\Columns\TextColumn::make('id')
-                    ->label('#')
+                    ->label('# Orden')
                     ->sortable()
                     ->weight('bold')
-                    ->size('sm'),
+                    ->size('sm')
+                    ->action(
+                        Tables\Actions\Action::make('view_sale')
+                            ->label('Ver Detalles')
+                            ->modalHeading(fn ($record) => 'Detalle de Venta #' . $record->id)
+                            ->modalContent(fn ($record) => view('filament.pages.sale-detail-modal', ['sale' => $record]))
+                            ->modalWidth('5xl')
+                            ->slideOver()
+                            ->icon('heroicon-o-eye')
+                    )
+                    ->color('primary')
+                    ->icon('heroicon-o-document-text'),
 
                 Tables\Columns\TextColumn::make('sale_date')
                     ->label('Fecha')
