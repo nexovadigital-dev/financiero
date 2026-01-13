@@ -24,6 +24,11 @@ class SaleResource extends Resource
     protected static ?string $modelLabel = 'Venta';
     protected static ?string $navigationGroup = 'Gestión';
 
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['items', 'client', 'paymentMethod', 'supplier']);
+    }
+
     public static function getGloballySearchableAttributes(): array
     {
         return ['id', 'client.name'];
@@ -579,21 +584,21 @@ class SaleResource extends Resource
                     ->icon('heroicon-o-user-circle'),
 
                 // 4. Nombre del Servicio/Artículo
-                Tables\Columns\TextColumn::make('items.product_name')
+                Tables\Columns\TextColumn::make('products_display')
                     ->label('Productos')
                     ->formatStateUsing(function ($record) {
                         $items = $record->items;
                         if ($items->count() === 0) return '-';
                         if ($items->count() === 1) {
-                            return $items->first()->product_name;
+                            return $items->first()->product_name ?? '-';
                         }
-                        $first = $items->first()->product_name;
+                        $first = $items->first()->product_name ?? 'Producto';
                         $count = $items->count() - 1;
                         return $first . " (+" . $count . " más)";
                     })
                     ->searchable(query: function ($query, $search) {
-                        return $query->whereHas('items', function ($query) use ($search) {
-                            $query->where('product_name', 'like', "%{$search}%");
+                        return $query->whereHas('items', function ($q) use ($search) {
+                            $q->where('product_name', 'like', "%{$search}%");
                         });
                     })
                     ->limit(35)
@@ -601,7 +606,7 @@ class SaleResource extends Resource
                     ->color('info'),
 
                 // 5. Costo Base (precio base en USD)
-                Tables\Columns\TextColumn::make('base_cost')
+                Tables\Columns\TextColumn::make('base_cost_display')
                     ->label('Costo Base')
                     ->formatStateUsing(function ($record) {
                         $totalBaseCost = $record->items->sum(function ($item) {
@@ -610,10 +615,7 @@ class SaleResource extends Resource
                         return '$' . number_format($totalBaseCost, 2) . ' USD';
                     })
                     ->color('danger')
-                    ->weight('medium')
-                    ->sortable(query: function ($query, $direction) {
-                        return $query->withSum('items', 'base_price')->orderBy('items_sum_base_price', $direction);
-                    }),
+                    ->weight('medium'),
 
                 // 6. Total Reportado (en la moneda que usó el admin)
                 Tables\Columns\TextColumn::make('total_amount')
