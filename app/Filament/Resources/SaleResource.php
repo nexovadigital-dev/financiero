@@ -563,7 +563,6 @@ class SaleResource extends Resource
                 Tables\Columns\TextColumn::make('id')
                     ->label('# Orden')
                     ->sortable()
-                    ->searchable()
                     ->weight('bold')
                     ->color('primary'),
 
@@ -577,7 +576,6 @@ class SaleResource extends Resource
                 // 3. Nombre del Cliente
                 Tables\Columns\TextColumn::make('client.name')
                     ->label('Cliente')
-                    ->searchable()
                     ->sortable()
                     ->weight('medium')
                     ->limit(25)
@@ -597,11 +595,6 @@ class SaleResource extends Resource
                         $firstName = $first->display_name ?? $first->product_name ?? 'Producto';
                         $count = $items->count() - 1;
                         return $firstName . " (+" . $count . " más)";
-                    })
-                    ->searchable(query: function ($query, string $search) {
-                        return $query->whereHas('items', function ($q) use ($search) {
-                            $q->where('product_name', 'like', "%{$search}%");
-                        });
                     })
                     ->limit(35)
                     ->wrap()
@@ -696,6 +689,20 @@ class SaleResource extends Resource
             ])
             ->defaultSort('created_at', 'desc')
             ->recordClasses(fn ($record) => $record->isRefunded() ? 'opacity-50 line-through' : null)
+            ->modifyQueryUsing(function ($query) {
+                // Interceptar la búsqueda para incluir productos
+                if ($search = request()->input('tableSearch')) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('id', 'like', "%{$search}%")
+                            ->orWhereHas('client', function ($clientQuery) use ($search) {
+                                $clientQuery->where('name', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('items', function ($itemQuery) use ($search) {
+                                $itemQuery->where('product_name', 'like', "%{$search}%");
+                            });
+                    });
+                }
+            })
             ->searchable()
             ->persistSearchInSession()
             ->persistColumnSearchesInSession()

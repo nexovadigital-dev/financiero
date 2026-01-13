@@ -362,17 +362,7 @@ class Reportes extends Page implements HasForms, HasTable
                     ->sortable()
                     ->weight('bold')
                     ->size('sm')
-                    ->action(
-                        Tables\Actions\Action::make('view_sale')
-                            ->label('Ver Detalles')
-                            ->modalHeading(fn ($record) => 'Detalle de Venta #' . $record->id)
-                            ->modalContent(fn ($record) => view('filament.pages.sale-detail-modal', ['sale' => $record]))
-                            ->modalWidth('5xl')
-                            ->slideOver()
-                            ->icon('heroicon-o-eye')
-                    )
-                    ->color('primary')
-                    ->icon('heroicon-o-document-text'),
+                    ->color('primary'),
 
                 Tables\Columns\TextColumn::make('sale_date')
                     ->label('Fecha')
