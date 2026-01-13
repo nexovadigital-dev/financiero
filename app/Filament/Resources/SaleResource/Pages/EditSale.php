@@ -13,8 +13,6 @@ class EditSale extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        $sale = $this->record;
-
         return [
             // BOTÓN REEMBOLSAR - Solo para ventas de créditos no reembolsadas
             Actions\Action::make('refund')
@@ -23,12 +21,14 @@ class EditSale extends EditRecord
                 ->color('warning')
                 ->requiresConfirmation()
                 ->modalHeading('¿Reembolsar esta venta de créditos?')
-                ->modalDescription(fn () =>
-                    'Se acreditará $' . number_format($sale->amount_usd, 2) . ' USD de vuelta al proveedor "' .
-                    $sale->supplier->name . '". Esta acción NO se puede deshacer.'
-                )
+                ->modalDescription(function () {
+                    $sale = $this->record;
+                    return 'Se acreditará $' . number_format($sale->amount_usd, 2) . ' USD de vuelta al proveedor "' .
+                        $sale->supplier->name . '". Esta acción NO se puede deshacer.';
+                })
                 ->modalSubmitActionLabel('Sí, Reembolsar')
-                ->action(function () use ($sale) {
+                ->action(function () {
+                    $sale = $this->record;
                     if ($sale->refund()) {
                         Notification::make()
                             ->success()
@@ -45,7 +45,7 @@ class EditSale extends EditRecord
                             ->send();
                     }
                 })
-                ->visible(fn () => $sale->canBeRefunded()),
+                ->visible(fn () => $this->record->canBeRefunded()),
 
             // BOTÓN ANULAR - Para todas las ventas que no estén canceladas
             Actions\Action::make('cancel')
@@ -54,18 +54,21 @@ class EditSale extends EditRecord
                 ->color('danger')
                 ->requiresConfirmation()
                 ->modalHeading('Anular Venta')
-                ->modalDescription(fn () =>
-                    "⚠️ ADVERTENCIA: Esta acción:\n\n" .
-                    "• Eliminará la ganancia de esta venta ($" . number_format($sale->amount_usd, 2) . " USD) de los reportes\n" .
-                    ($sale->supplier_id
-                        ? "• Devolverá el crédito al proveedor {$sale->supplier->name}\n"
-                        : "") .
-                    "• Marcará la venta como Cancelada\n" .
-                    "• Esta acción NO se puede revertir\n\n" .
-                    "¿Está seguro que desea anular esta venta?"
-                )
+                ->modalDescription(function () {
+                    $sale = $this->record;
+                    return "⚠️ ADVERTENCIA: Esta acción:\n\n" .
+                        "• Eliminará la ganancia de esta venta ($" . number_format($sale->amount_usd, 2) . " USD) de los reportes\n" .
+                        ($sale->supplier_id && $sale->supplier
+                            ? "• Devolverá el crédito al proveedor {$sale->supplier->name}\n"
+                            : "") .
+                        "• Marcará la venta como Cancelada\n" .
+                        "• Esta acción NO se puede revertir\n\n" .
+                        "¿Está seguro que desea anular esta venta?";
+                })
                 ->modalSubmitActionLabel('Sí, anular venta')
-                ->action(function () use ($sale) {
+                ->action(function () {
+                    $sale = $this->record;
+
                     // Calcular el monto a devolver (precio base)
                     $totalBaseCost = $sale->items->sum(function ($item) {
                         return ($item->base_price ?? 0) * $item->quantity;
@@ -104,11 +107,11 @@ class EditSale extends EditRecord
 
                     return redirect()->route('filament.admin.resources.sales.index');
                 })
-                ->visible(fn () => $sale->status !== 'cancelled'),
+                ->visible(fn () => $this->record->status !== 'cancelled'),
 
             // BOTÓN ELIMINAR - Solo para ventas NO de créditos o sin proveedor
             Actions\DeleteAction::make()
-                ->visible(fn () => !$sale->isProviderCredit() || $sale->without_supplier),
+                ->visible(fn () => !$this->record->isProviderCredit() || $this->record->without_supplier),
         ];
     }
 
