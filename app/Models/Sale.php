@@ -82,14 +82,11 @@ class Sale extends Model
     public function shouldDebitSupplier(): bool
     {
         // Solo debita si:
-        // 1. Es una venta con método de pago "Créditos Servidor"
-        // 2. Tiene proveedor asignado
-        // 3. NO está marcada como "without_supplier"
-        // 4. NO está reembolsada
-        return $this->isProviderCredit()
-            && $this->supplier_id
-            && !$this->without_supplier
-            && !$this->isRefunded();
+        // 1. Tiene proveedor asignado (supplier_id)
+        // 2. NO está cancelada
+        // Sin importar el método de pago - TODAS las ventas con proveedor debitan
+        return $this->supplier_id !== null
+            && $this->status !== 'cancelled';
     }
 
     /**

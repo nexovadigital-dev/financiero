@@ -4,7 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\SupplierCreditTransactionResource\Pages;
 use App\Models\SupplierBalanceTransaction;
+use App\Models\Sale;
 use Filament\Forms\Form;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -31,6 +34,134 @@ class SupplierCreditTransactionResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([]); // Solo lectura, no se pueden crear/editar
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('Información de la Transacción')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('type')
+                            ->label('Tipo')
+                            ->badge()
+                            ->formatStateUsing(fn ($record) => $record->type_name)
+                            ->color(fn ($record) => $record->type_color),
+
+                        Infolists\Components\TextEntry::make('created_at')
+                            ->label('Fecha')
+                            ->dateTime('d/m/Y H:i:s'),
+
+                        Infolists\Components\TextEntry::make('supplier.name')
+                            ->label('Proveedor')
+                            ->weight('bold'),
+
+                        Infolists\Components\TextEntry::make('amount')
+                            ->label('Monto')
+                            ->formatStateUsing(fn ($state) =>
+                                ($state >= 0 ? '+' : '') . '$' . number_format(abs($state), 2) . ' USD'
+                            )
+                            ->color(fn ($state) => $state >= 0 ? 'success' : 'danger')
+                            ->weight('bold'),
+
+                        Infolists\Components\TextEntry::make('balance_before')
+                            ->label('Balance Antes')
+                            ->money('USD'),
+
+                        Infolists\Components\TextEntry::make('balance_after')
+                            ->label('Balance Después')
+                            ->money('USD')
+                            ->weight('bold'),
+
+                        Infolists\Components\TextEntry::make('description')
+                            ->label('Descripción')
+                            ->columnSpanFull(),
+
+                        Infolists\Components\TextEntry::make('user.name')
+                            ->label('Usuario que registró')
+                            ->default('Sistema automático')
+                            ->icon('heroicon-o-user'),
+                    ])
+                    ->columns(2),
+
+                Infolists\Components\Section::make('Datos de la Venta')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('reference.id')
+                            ->label('ID Venta')
+                            ->formatStateUsing(fn ($state) => '#' . $state)
+                            ->weight('bold'),
+
+                        Infolists\Components\TextEntry::make('reference.client.name')
+                            ->label('Cliente')
+                            ->icon('heroicon-o-user-circle'),
+
+                        Infolists\Components\TextEntry::make('reference.payment_method.name')
+                            ->label('Método de Pago')
+                            ->badge(),
+
+                        Infolists\Components\TextEntry::make('reference.amount_usd')
+                            ->label('Total Venta')
+                            ->money('USD')
+                            ->weight('bold'),
+
+                        Infolists\Components\TextEntry::make('reference.status')
+                            ->label('Estado')
+                            ->badge()
+                            ->formatStateUsing(fn ($state) => match($state) {
+                                'pending' => 'Pendiente',
+                                'completed' => 'Completada',
+                                'cancelled' => 'Cancelada',
+                                default => $state,
+                            })
+                            ->color(fn ($state) => match($state) {
+                                'pending' => 'warning',
+                                'completed' => 'success',
+                                'cancelled' => 'danger',
+                                default => 'gray',
+                            }),
+
+                        Infolists\Components\TextEntry::make('reference.created_at')
+                            ->label('Fecha de Venta')
+                            ->dateTime('d/m/Y H:i'),
+
+                        Infolists\Components\TextEntry::make('reference.notes')
+                            ->label('Notas')
+                            ->columnSpanFull()
+                            ->default('Sin notas'),
+                    ])
+                    ->columns(2)
+                    ->visible(fn ($record) => $record->reference_type === 'App\\Models\\Sale' && $record->reference),
+
+                Infolists\Components\Section::make('Productos de la Venta')
+                    ->schema([
+                        Infolists\Components\RepeatableEntry::make('reference.items')
+                            ->label('')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('product_name')
+                                    ->label('Producto')
+                                    ->weight('bold'),
+
+                                Infolists\Components\TextEntry::make('quantity')
+                                    ->label('Cantidad'),
+
+                                Infolists\Components\TextEntry::make('base_price')
+                                    ->label('Precio Base')
+                                    ->money('USD'),
+
+                                Infolists\Components\TextEntry::make('price')
+                                    ->label('Precio Venta')
+                                    ->money('USD'),
+
+                                Infolists\Components\TextEntry::make('total')
+                                    ->label('Subtotal')
+                                    ->formatStateUsing(fn ($record) => '$' . number_format($record->price * $record->quantity, 2))
+                                    ->weight('bold'),
+                            ])
+                            ->columns(5),
+                    ])
+                    ->collapsed()
+                    ->visible(fn ($record) => $record->reference_type === 'App\\Models\\Sale' && $record->reference && $record->reference->items->count() > 0),
+            ]);
     }
 
     public static function table(Table $table): Table

@@ -211,10 +211,15 @@ class SaleResource extends Resource
                                     ->options([
                                         'pending' => 'Pendiente',
                                         'completed' => 'Completado',
-                                        'cancelled' => 'Cancelado',
                                     ])
                                     ->default('completed')
-                                    ->required(),
+                                    ->required()
+                                    ->disabled(fn ($record) => $record?->status === 'cancelled')
+                                    ->helperText(fn ($record) =>
+                                        $record?->status === 'cancelled'
+                                            ? '⚠️ Esta venta fue anulada y no se puede modificar'
+                                            : null
+                                    ),
                             ])->columns(2),
                     ])->columnSpan(2),
 
@@ -675,7 +680,65 @@ class SaleResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->recordClasses(fn ($record) => $record->isRefunded() ? 'opacity-50 line-through' : null)
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->hidden(fn ($record) => $record->status === 'cancelled'),
+
+                Tables\Actions\Action::make('cancel')
+                    ->label('Anular')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Anular Venta')
+                    ->modalDescription(fn ($record) =>
+                        "⚠️ ADVERTENCIA: Esta acción:\n\n" .
+                        "• Eliminará la ganancia de esta venta ($" . number_format($record->amount_usd, 2) . " USD) de los reportes\n" .
+                        ($record->supplier_id
+                            ? "• Devolverá el crédito al proveedor {$record->supplier->name}\n"
+                            : "") .
+                        "• Marcará la venta como Cancelada\n" .
+                        "• Esta acción NO se puede revertir\n\n" .
+                        "¿Está seguro que desea anular esta venta?"
+                    )
+                    ->modalSubmitActionLabel('Sí, anular venta')
+                    ->action(function (Sale $record) {
+                        // Calcular el monto a devolver (precio base)
+                        $totalBaseCost = $record->items->sum(function ($item) {
+                            return ($item->base_price ?? 0) * $item->quantity;
+                        });
+                        $amountToRefund = $totalBaseCost > 0 ? $totalBaseCost : $record->amount_usd;
+
+                        // Si tiene proveedor, devolver el crédito
+                        if ($record->supplier_id && $record->supplier) {
+                            $record->supplier->addToBalance(
+                                amount: $amountToRefund,
+                                type: 'sale_refund',
+                                description: "Anulación Venta #{$record->id} - Cliente: {$record->client->name}",
+                                reference: $record
+                            );
+
+                            \Log::info('↩️ Crédito devuelto por anulación de venta', [
+                                'sale_id' => $record->id,
+                                'supplier' => $record->supplier->name,
+                                'amount_refunded' => $amountToRefund,
+                                'user_id' => auth()->id(),
+                            ]);
+                        }
+
+                        // Marcar venta como cancelada
+                        $record->update([
+                            'status' => 'cancelled',
+                            'refunded_at' => now(),
+                        ]);
+
+                        \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Venta Anulada')
+                            ->body("La venta #{$record->id} ha sido anulada exitosamente." .
+                                ($record->supplier_id ? " Se devolvió el crédito al proveedor." : ""))
+                            ->send();
+                    })
+                    ->visible(fn ($record) => $record->status !== 'cancelled'),
+
                 Tables\Actions\DeleteAction::make()
                     ->requiresConfirmation()
                     ->modalHeading('Eliminar Venta')
