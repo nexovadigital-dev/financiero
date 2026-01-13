@@ -554,48 +554,70 @@ class SaleResource extends Resource
     {
         return $table
             ->columns([
+                // 1. Número de Orden
                 Tables\Columns\TextColumn::make('id')
-                    ->label('#')
+                    ->label('# Orden')
                     ->sortable()
-                    ->weight('bold'),
+                    ->searchable()
+                    ->weight('bold')
+                    ->color('primary'),
 
-                Tables\Columns\TextColumn::make('source')
-                    ->label('Origen')
-                    ->badge()
-                    ->colors([
-                        'success' => 'store',
-                        'warning' => 'server',
-                    ])
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'store' => '🏪',
-                        'server' => '🖥️',
-                        default => $state,
-                    }),
-
+                // 2. Fecha de la Orden
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Fecha')
                     ->dateTime('d/m/Y H:i')
-                    ->sortable(),
+                    ->sortable()
+                    ->description(fn ($record) => $record->created_at->diffForHumans()),
 
+                // 3. Nombre del Cliente
                 Tables\Columns\TextColumn::make('client.name')
                     ->label('Cliente')
                     ->searchable()
-                    ->limit(30),
+                    ->sortable()
+                    ->weight('medium')
+                    ->limit(25)
+                    ->icon('heroicon-o-user-circle'),
 
-                Tables\Columns\TextColumn::make('items_count')
-                    ->label('Items')
-                    ->counts('items')
-                    ->badge()
+                // 4. Nombre del Servicio/Artículo
+                Tables\Columns\TextColumn::make('items.product_name')
+                    ->label('Productos')
+                    ->formatStateUsing(function ($record) {
+                        $items = $record->items;
+                        if ($items->count() === 0) return '-';
+                        if ($items->count() === 1) {
+                            return $items->first()->product_name;
+                        }
+                        $first = $items->first()->product_name;
+                        $count = $items->count() - 1;
+                        return $first . " (+" . $count . " más)";
+                    })
+                    ->searchable(query: function ($query, $search) {
+                        return $query->whereHas('items', function ($query) use ($search) {
+                            $query->where('product_name', 'like', "%{$search}%");
+                        });
+                    })
+                    ->limit(35)
+                    ->wrap()
                     ->color('info'),
 
-                Tables\Columns\TextColumn::make('paymentMethod.name')
-                    ->label('Pago')
-                    ->badge()
-                    ->color('gray')
-                    ->limit(20),
+                // 5. Costo Base (precio base en USD)
+                Tables\Columns\TextColumn::make('base_cost')
+                    ->label('Costo Base')
+                    ->formatStateUsing(function ($record) {
+                        $totalBaseCost = $record->items->sum(function ($item) {
+                            return ($item->base_price ?? 0) * $item->quantity;
+                        });
+                        return '$' . number_format($totalBaseCost, 2) . ' USD';
+                    })
+                    ->color('danger')
+                    ->weight('medium')
+                    ->sortable(query: function ($query, $direction) {
+                        return $query->withSum('items', 'base_price')->orderBy('items_sum_base_price', $direction);
+                    }),
 
+                // 6. Total Reportado (en la moneda que usó el admin)
                 Tables\Columns\TextColumn::make('total_amount')
-                    ->label('Total')
+                    ->label('Total Reportado')
                     ->formatStateUsing(function ($record) {
                         $currency = $record->currency ?? 'USD';
                         $symbol = match($currency) {
@@ -607,38 +629,39 @@ class SaleResource extends Resource
                         return $symbol . number_format($record->total_amount, 2) . ' ' . $currency;
                     })
                     ->weight('bold')
+                    ->color('success')
                     ->sortable(),
 
+                // 7. Método de Pago
+                Tables\Columns\TextColumn::make('paymentMethod.name')
+                    ->label('Método Pago')
+                    ->badge()
+                    ->color('gray')
+                    ->limit(20)
+                    ->toggleable(),
+
+                // 8. Estado
                 Tables\Columns\TextColumn::make('status')
                     ->label('Estado')
                     ->badge()
-                    ->formatStateUsing(fn ($state, $record) =>
-                        $record->isRefunded() ? 'Reembolsado' :
-                        ($record->isProviderCredit() ? 'A Crédito' : match($state) {
-                            'completed' => 'Completado',
-                            'pending' => 'Pendiente',
-                            'cancelled' => 'Cancelado',
-                            default => 'Completado',
-                        })
-                    )
-                    ->color(fn ($state, $record) =>
-                        $record->isRefunded() ? 'danger' :
-                        ($record->isProviderCredit() ? 'warning' : match($state) {
-                            'completed' => 'success',
-                            'pending' => 'warning',
-                            'cancelled' => 'danger',
-                            default => 'success',
-                        })
-                    )
-                    ->icon(fn ($state, $record) =>
-                        $record->isRefunded() ? 'heroicon-o-arrow-uturn-left' :
-                        ($record->isProviderCredit() ? 'heroicon-o-credit-card' : match($state) {
-                            'completed' => 'heroicon-o-check-circle',
-                            'pending' => 'heroicon-o-clock',
-                            'cancelled' => 'heroicon-o-x-circle',
-                            default => 'heroicon-o-check-circle',
-                        })
-                    )
+                    ->formatStateUsing(fn ($state) => match($state) {
+                        'completed' => 'Completado',
+                        'pending' => 'Pendiente',
+                        'cancelled' => 'Cancelado',
+                        default => 'Completado',
+                    })
+                    ->color(fn ($state) => match($state) {
+                        'completed' => 'success',
+                        'pending' => 'warning',
+                        'cancelled' => 'danger',
+                        default => 'success',
+                    })
+                    ->icon(fn ($state) => match($state) {
+                        'completed' => 'heroicon-o-check-circle',
+                        'pending' => 'heroicon-o-clock',
+                        'cancelled' => 'heroicon-o-x-circle',
+                        default => 'heroicon-o-check-circle',
+                    })
                     ->sortable(),
             ])
             ->filters([
