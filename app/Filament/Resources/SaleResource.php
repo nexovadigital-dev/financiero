@@ -207,10 +207,10 @@ class SaleResource extends Resource
                                     ->required(),
 
                                 Forms\Components\Select::make('status')
-                                    ->label('Estado')
+                                    ->label('Estado del Pedido')
                                     ->options([
-                                        'pending' => 'Pendiente',
-                                        'completed' => 'Completado',
+                                        'pending' => '⏳ Pendiente',
+                                        'completed' => '✓ Completado',
                                     ])
                                     ->default('completed')
                                     ->required()
@@ -218,7 +218,7 @@ class SaleResource extends Resource
                                     ->helperText(fn ($record) =>
                                         $record?->status === 'cancelled'
                                             ? '⚠️ Esta venta fue anulada y no se puede modificar'
-                                            : null
+                                            : 'Estado actual de la orden de venta'
                                     ),
                             ])->columns(2),
                     ])->columnSpan(2),
@@ -291,19 +291,6 @@ class SaleResource extends Resource
                                         self::convertCurrency($get, $set, $state);
                                     })
                                     ->required(),
-
-                                Forms\Components\Select::make('status')
-                                    ->label('Estado de la Orden')
-                                    ->options([
-                                        'completed' => '✓ Completado',
-                                        'pending' => '⏳ Pendiente',
-                                        'cancelled' => '✗ Cancelado',
-                                    ])
-                                    ->default('completed')
-                                    ->required()
-                                    ->native(false)
-                                    ->columnSpanFull()
-                                    ->helperText('Estado actual de la orden de venta'),
 
                                 Forms\Components\TextInput::make('total_amount')
                                     ->label('TOTAL A PAGAR')
