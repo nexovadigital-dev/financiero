@@ -117,27 +117,47 @@ class SupplierResource extends Resource
                     ->icon('heroicon-o-adjustments-horizontal')
                     ->color('warning')
                     ->form([
+                        Forms\Components\Radio::make('adjustment_type')
+                            ->label('Tipo de Ajuste')
+                            ->options([
+                                'increase' => '⬆️ Aumentar Balance (Agregar Créditos)',
+                                'decrease' => '⬇️ Reducir Balance (Debitar Créditos)',
+                            ])
+                            ->required()
+                            ->default('increase')
+                            ->live()
+                            ->columnSpanFull(),
+
                         Forms\Components\TextInput::make('adjustment')
                             ->label('Monto del Ajuste (USD)')
                             ->prefix('$')
                             ->numeric()
                             ->required()
                             ->step(0.01)
-                            ->helperText('Ingrese monto positivo para AUMENTAR balance, o negativo para REDUCIR'),
+                            ->minValue(0.01)
+                            ->helperText(fn (Forms\Get $get) =>
+                                $get('adjustment_type') === 'increase'
+                                    ? '💰 Este monto se AGREGARÁ al balance del proveedor'
+                                    : '⚠️ Este monto se RESTARÁ del balance del proveedor'
+                            )
+                            ->columnSpanFull(),
 
                         Forms\Components\Textarea::make('reason')
                             ->label('Motivo del Ajuste')
                             ->required()
                             ->rows(3)
-                            ->helperText('Explique por qué está ajustando el balance (para auditoría)'),
+                            ->placeholder('Ej: Corrección por error de sistema, Ajuste acordado con proveedor, etc.')
+                            ->helperText('Explique claramente por qué está ajustando el balance (para auditoría)')
+                            ->columnSpanFull(),
                     ])
                     ->action(function (Supplier $record, array $data) {
                         $oldBalance = $record->balance;
                         $adjustment = floatval($data['adjustment']);
+                        $adjustmentType = $data['adjustment_type'];
                         $reason = $data['reason'];
 
-                        // Ajustar balance con registro automático de transacción
-                        if ($adjustment > 0) {
+                        // Ajustar balance según el tipo seleccionado
+                        if ($adjustmentType === 'increase') {
                             $record->addToBalance(
                                 amount: $adjustment,
                                 type: 'manual_adjustment',
@@ -146,20 +166,23 @@ class SupplierResource extends Resource
                             );
                         } else {
                             $record->subtractFromBalance(
-                                amount: abs($adjustment),
+                                amount: $adjustment,
                                 type: 'manual_adjustment',
                                 description: $reason,
                                 reference: null
                             );
                         }
 
+                        $newBalance = $record->fresh()->balance;
+
                         // Log detallado para auditoría
                         \Log::info('⚖️ Ajuste manual de balance de proveedor', [
                             'supplier_id' => $record->id,
                             'supplier_name' => $record->name,
+                            'adjustment_type' => $adjustmentType,
                             'old_balance' => $oldBalance,
-                            'adjustment' => $adjustment,
-                            'new_balance' => $record->fresh()->balance,
+                            'adjustment' => $adjustmentType === 'increase' ? $adjustment : -$adjustment,
+                            'new_balance' => $newBalance,
                             'reason' => $reason,
                             'user_id' => auth()->id(),
                         ]);
@@ -167,7 +190,7 @@ class SupplierResource extends Resource
                         Notification::make()
                             ->success()
                             ->title('Balance Ajustado')
-                            ->body("Balance de {$record->name} actualizado: \${$oldBalance} → \$" . number_format($record->fresh()->balance, 2))
+                            ->body("Balance de {$record->name} actualizado: \${$oldBalance} → \$" . number_format($newBalance, 2))
                             ->send();
                     })
                     ->requiresConfirmation()

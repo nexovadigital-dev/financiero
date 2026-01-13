@@ -12,14 +12,32 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Primero, eliminar transacciones migradas anteriormente para evitar duplicados
+        DB::table('supplier_balance_transactions')
+            ->where('description', 'LIKE', '%(Migrado)%')
+            ->delete();
+
+        \Log::info('🔍 Iniciando migración de transacciones históricas');
+
         // Migrar todas las ventas a crédito existentes a la tabla de transacciones
         $sales = DB::table('sales')
             ->join('payment_methods', 'sales.payment_method_id', '=', 'payment_methods.id')
-            ->where('payment_methods.name', 'LIKE', '%Créditos Servidor%')
+            ->where(function($query) {
+                $query->where('payment_methods.name', 'LIKE', '%Créditos Servidor%')
+                      ->orWhere('payment_methods.name', 'LIKE', '%Creditos Servidor%')
+                      ->orWhere('payment_methods.name', 'LIKE', '%crédito%')
+                      ->orWhere('payment_methods.name', 'LIKE', '%credito%');
+            })
             ->whereNotNull('sales.supplier_id')
             ->select('sales.*')
             ->get();
 
+        \Log::info('📊 Ventas encontradas para migrar', [
+            'total_ventas' => $sales->count(),
+            'ventas_ids' => $sales->pluck('id')->toArray()
+        ]);
+
+        $salesMigrated = 0;
         foreach ($sales as $sale) {
             // Calcular el monto debitado (costo base de los items)
             $totalBaseCost = DB::table('sale_items')
@@ -30,12 +48,14 @@ return new class extends Migration
             $amountToDebit = $totalBaseCost > 0 ? $totalBaseCost : ($sale->amount_usd ?? 0);
 
             if ($amountToDebit <= 0) {
+                \Log::warning('⚠️ Venta sin monto a debitar', ['sale_id' => $sale->id]);
                 continue;
             }
 
             // Obtener el proveedor
             $supplier = DB::table('suppliers')->where('id', $sale->supplier_id)->first();
             if (!$supplier) {
+                \Log::warning('⚠️ Proveedor no encontrado', ['sale_id' => $sale->id, 'supplier_id' => $sale->supplier_id]);
                 continue;
             }
 
@@ -74,6 +94,7 @@ return new class extends Migration
                     'created_at' => $sale->refunded_at,
                     'updated_at' => $sale->refunded_at,
                 ]);
+                $salesMigrated += 2; // Contamos ambas transacciones
             } else {
                 // Solo transacción de débito (venta activa)
                 DB::table('supplier_balance_transactions')->insert([
@@ -89,8 +110,11 @@ return new class extends Migration
                     'created_at' => $sale->created_at,
                     'updated_at' => $sale->created_at,
                 ]);
+                $salesMigrated++;
             }
         }
+
+        \Log::info('✅ Ventas migradas', ['transacciones_creadas' => $salesMigrated]);
 
         // Migrar todos los pagos a proveedores existentes
         $expenses = DB::table('expenses')
@@ -98,6 +122,11 @@ return new class extends Migration
             ->whereNotNull('supplier_id')
             ->get();
 
+        \Log::info('📊 Pagos encontrados para migrar', [
+            'total_pagos' => $expenses->count(),
+        ]);
+
+        $paymentsMigrated = 0;
         foreach ($expenses as $expense) {
             $creditsReceived = floatval($expense->credits_received ?? 0);
 
@@ -118,11 +147,15 @@ return new class extends Migration
                 'created_at' => $expense->payment_date,
                 'updated_at' => $expense->payment_date,
             ]);
+            $paymentsMigrated++;
         }
 
         \Log::info('✅ Migración de transacciones históricas completada', [
-            'ventas_migradas' => $sales->count(),
-            'pagos_migrados' => $expenses->count(),
+            'ventas_encontradas' => $sales->count(),
+            'transacciones_ventas_creadas' => $salesMigrated,
+            'pagos_encontrados' => $expenses->count(),
+            'transacciones_pagos_creadas' => $paymentsMigrated,
+            'total_transacciones' => $salesMigrated + $paymentsMigrated,
         ]);
     }
 
