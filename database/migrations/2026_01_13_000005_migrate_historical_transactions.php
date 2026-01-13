@@ -19,20 +19,12 @@ return new class extends Migration
 
         \Log::info('🔍 Iniciando migración de transacciones históricas');
 
-        // Migrar todas las ventas a crédito existentes a la tabla de transacciones
+        // Migrar TODAS las ventas que tienen proveedor conectado (sin importar método de pago)
         $sales = DB::table('sales')
-            ->join('payment_methods', 'sales.payment_method_id', '=', 'payment_methods.id')
-            ->where(function($query) {
-                $query->where('payment_methods.name', 'LIKE', '%Créditos Servidor%')
-                      ->orWhere('payment_methods.name', 'LIKE', '%Creditos Servidor%')
-                      ->orWhere('payment_methods.name', 'LIKE', '%crédito%')
-                      ->orWhere('payment_methods.name', 'LIKE', '%credito%');
-            })
-            ->whereNotNull('sales.supplier_id')
-            ->select('sales.*')
+            ->whereNotNull('supplier_id')
             ->get();
 
-        \Log::info('📊 Ventas encontradas para migrar', [
+        \Log::info('📊 Ventas con proveedor encontradas para migrar', [
             'total_ventas' => $sales->count(),
             'ventas_ids' => $sales->pluck('id')->toArray()
         ]);
