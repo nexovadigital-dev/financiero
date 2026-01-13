@@ -287,6 +287,19 @@ class SaleResource extends Resource
                                     })
                                     ->required(),
 
+                                Forms\Components\Select::make('status')
+                                    ->label('Estado de la Orden')
+                                    ->options([
+                                        'completed' => '✓ Completado',
+                                        'pending' => '⏳ Pendiente',
+                                        'cancelled' => '✗ Cancelado',
+                                    ])
+                                    ->default('completed')
+                                    ->required()
+                                    ->native(false)
+                                    ->columnSpanFull()
+                                    ->helperText('Estado actual de la orden de venta'),
+
                                 Forms\Components\TextInput::make('total_amount')
                                     ->label('TOTAL A PAGAR')
                                     ->prefix(function (Get $get) {
@@ -604,21 +617,37 @@ class SaleResource extends Resource
                     ->weight('bold')
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('refunded_at')
+                Tables\Columns\TextColumn::make('status')
                     ->label('Estado')
                     ->badge()
                     ->formatStateUsing(fn ($state, $record) =>
-                        $record->isRefunded() ? 'REEMB.' :
-                        ($record->isProviderCredit() ? 'Crédito' : 'OK')
+                        $record->isRefunded() ? 'Reembolsado' :
+                        ($record->isProviderCredit() ? 'A Crédito' : match($state) {
+                            'completed' => 'Completado',
+                            'pending' => 'Pendiente',
+                            'cancelled' => 'Cancelado',
+                            default => 'Completado',
+                        })
                     )
-                    ->color(fn ($record) =>
+                    ->color(fn ($state, $record) =>
                         $record->isRefunded() ? 'danger' :
-                        ($record->isProviderCredit() ? 'warning' : 'success')
+                        ($record->isProviderCredit() ? 'warning' : match($state) {
+                            'completed' => 'success',
+                            'pending' => 'warning',
+                            'cancelled' => 'danger',
+                            default => 'success',
+                        })
                     )
-                    ->icon(fn ($record) =>
+                    ->icon(fn ($state, $record) =>
                         $record->isRefunded() ? 'heroicon-o-arrow-uturn-left' :
-                        ($record->isProviderCredit() ? 'heroicon-o-credit-card' : 'heroicon-o-check-circle')
-                    ),
+                        ($record->isProviderCredit() ? 'heroicon-o-credit-card' : match($state) {
+                            'completed' => 'heroicon-o-check-circle',
+                            'pending' => 'heroicon-o-clock',
+                            'cancelled' => 'heroicon-o-x-circle',
+                            default => 'heroicon-o-check-circle',
+                        })
+                    )
+                    ->sortable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('source')
