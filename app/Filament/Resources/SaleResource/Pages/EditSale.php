@@ -47,6 +47,65 @@ class EditSale extends EditRecord
                 })
                 ->visible(fn () => $sale->canBeRefunded()),
 
+            // BOTÓN ANULAR - Para todas las ventas que no estén canceladas
+            Actions\Action::make('cancel')
+                ->label('Anular Venta')
+                ->icon('heroicon-o-x-circle')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading('Anular Venta')
+                ->modalDescription(fn () =>
+                    "⚠️ ADVERTENCIA: Esta acción:\n\n" .
+                    "• Eliminará la ganancia de esta venta ($" . number_format($sale->amount_usd, 2) . " USD) de los reportes\n" .
+                    ($sale->supplier_id
+                        ? "• Devolverá el crédito al proveedor {$sale->supplier->name}\n"
+                        : "") .
+                    "• Marcará la venta como Cancelada\n" .
+                    "• Esta acción NO se puede revertir\n\n" .
+                    "¿Está seguro que desea anular esta venta?"
+                )
+                ->modalSubmitActionLabel('Sí, anular venta')
+                ->action(function () use ($sale) {
+                    // Calcular el monto a devolver (precio base)
+                    $totalBaseCost = $sale->items->sum(function ($item) {
+                        return ($item->base_price ?? 0) * $item->quantity;
+                    });
+                    $amountToRefund = $totalBaseCost > 0 ? $totalBaseCost : $sale->amount_usd;
+
+                    // Si tiene proveedor, devolver el crédito
+                    if ($sale->supplier_id && $sale->supplier) {
+                        $sale->supplier->addToBalance(
+                            amount: $amountToRefund,
+                            type: 'sale_refund',
+                            description: "Anulación Venta #{$sale->id} - Cliente: {$sale->client->name}",
+                            reference: $sale
+                        );
+
+                        \Log::info('↩️ Crédito devuelto por anulación de venta', [
+                            'sale_id' => $sale->id,
+                            'supplier' => $sale->supplier->name,
+                            'amount_refunded' => $amountToRefund,
+                            'user_id' => auth()->id(),
+                        ]);
+                    }
+
+                    // Marcar venta como cancelada
+                    $sale->update([
+                        'status' => 'cancelled',
+                        'refunded_at' => now(),
+                    ]);
+
+                    Notification::make()
+                        ->success()
+                        ->title('Venta Anulada')
+                        ->body("La venta #{$sale->id} ha sido anulada exitosamente." .
+                            ($sale->supplier_id ? " Se devolvió el crédito al proveedor." : ""))
+                        ->send();
+
+                    return redirect()->route('filament.admin.resources.sales.index');
+                })
+                ->visible(fn () => $sale->status !== 'cancelled'),
+
             // BOTÓN ELIMINAR - Solo para ventas NO de créditos o sin proveedor
             Actions\DeleteAction::make()
                 ->visible(fn () => !$sale->isProviderCredit() || $sale->without_supplier),
