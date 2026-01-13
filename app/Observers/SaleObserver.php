@@ -35,7 +35,12 @@ class SaleObserver
         }
 
         $oldBalance = $sale->supplier->balance;
-        $sale->supplier->subtractFromBalance($amountToDebit);
+        $sale->supplier->subtractFromBalance(
+            amount: $amountToDebit,
+            type: 'sale_debit',
+            description: "Venta #{$sale->id} - Cliente: {$sale->client->name}",
+            reference: $sale
+        );
 
         Log::info('💳 Balance debitado por venta de créditos', [
             'sale_id' => $sale->id,

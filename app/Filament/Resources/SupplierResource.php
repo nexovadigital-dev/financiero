@@ -134,12 +134,23 @@ class SupplierResource extends Resource
                     ->action(function (Supplier $record, array $data) {
                         $oldBalance = $record->balance;
                         $adjustment = floatval($data['adjustment']);
+                        $reason = $data['reason'];
 
-                        // Ajustar balance
+                        // Ajustar balance con registro automático de transacción
                         if ($adjustment > 0) {
-                            $record->addToBalance($adjustment);
+                            $record->addToBalance(
+                                amount: $adjustment,
+                                type: 'manual_adjustment',
+                                description: $reason,
+                                reference: null
+                            );
                         } else {
-                            $record->subtractFromBalance(abs($adjustment));
+                            $record->subtractFromBalance(
+                                amount: abs($adjustment),
+                                type: 'manual_adjustment',
+                                description: $reason,
+                                reference: null
+                            );
                         }
 
                         // Log detallado para auditoría
@@ -149,7 +160,7 @@ class SupplierResource extends Resource
                             'old_balance' => $oldBalance,
                             'adjustment' => $adjustment,
                             'new_balance' => $record->fresh()->balance,
-                            'reason' => $data['reason'],
+                            'reason' => $reason,
                             'user_id' => auth()->id(),
                         ]);
 

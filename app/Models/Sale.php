@@ -154,9 +154,14 @@ class Sale extends Model
         $this->refunded_at = now();
         $this->save();
 
-        // Acreditar el monto de vuelta al proveedor
+        // Acreditar el monto de vuelta al proveedor con registro de auditoría
         $oldBalance = $this->supplier->balance;
-        $this->supplier->addToBalance($amountToRefund);
+        $this->supplier->addToBalance(
+            amount: $amountToRefund,
+            type: 'sale_refund',
+            description: "Reembolso Venta #{$this->id} - Cliente: {$this->client->name}",
+            reference: $this
+        );
 
         \Log::info('💰 Venta de créditos reembolsada exitosamente', [
             'sale_id' => $this->id,
