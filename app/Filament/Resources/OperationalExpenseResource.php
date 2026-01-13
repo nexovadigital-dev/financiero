@@ -214,20 +214,45 @@ class OperationalExpenseResource extends Resource
                     ->preload(),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\ViewAction::make()
+                    ->label('Ver Detalle')
+                    ->icon('heroicon-o-eye')
+                    ->modalHeading('Detalle del Gasto Operativo')
+                    ->modalSubmitAction(false) // No mostrar botón de guardar
+                    ->modalCancelActionLabel('Cerrar'),
+
                 Tables\Actions\DeleteAction::make()
+                    ->label('Eliminar')
+                    ->icon('heroicon-o-trash')
                     ->requiresConfirmation()
-                    ->modalHeading('Eliminar Gasto')
-                    ->modalDescription('¿Está seguro que desea eliminar este gasto?')
-                    ->modalSubmitActionLabel('Sí, eliminar'),
+                    ->modalHeading('Eliminar Gasto Operativo')
+                    ->modalDescription('⚠️ ADVERTENCIA: Al eliminar este gasto operativo, se revertirá la sumatoria de los reportes e indicadores financieros. Esta acción NO se puede deshacer.')
+                    ->modalSubmitActionLabel('Sí, eliminar gasto')
+                    ->successNotificationTitle('Gasto eliminado')
+                    ->successNotification(function () {
+                        return \Filament\Notifications\Notification::make()
+                            ->success()
+                            ->title('Gasto Operativo Eliminado')
+                            ->body('El gasto ha sido eliminado y los reportes se han actualizado automáticamente.')
+                            ->send();
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
                         ->requiresConfirmation()
-                        ->modalHeading('Eliminar Gastos Seleccionados')
-                        ->modalDescription('¿Está seguro? Se eliminarán los gastos seleccionados.')
-                        ->modalSubmitActionLabel('Sí, eliminar todos'),
+                        ->modalHeading('Eliminar Gastos Operativos Seleccionados')
+                        ->modalDescription('⚠️ ADVERTENCIA: Al eliminar estos gastos operativos, se revertirán las sumatorias de los reportes e indicadores financieros. Esta acción NO se puede deshacer.')
+                        ->modalSubmitActionLabel('Sí, eliminar todos')
+                        ->successNotificationTitle('Gastos eliminados')
+                        ->successNotification(function ($records) {
+                            $count = count($records);
+                            return \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('Gastos Operativos Eliminados')
+                                ->body("{$count} gasto(s) eliminado(s). Los reportes se han actualizado automáticamente.")
+                                ->send();
+                        }),
                 ]),
             ]);
     }
@@ -237,7 +262,8 @@ class OperationalExpenseResource extends Resource
         return [
             'index' => Pages\ListOperationalExpenses::route('/'),
             'create' => Pages\CreateOperationalExpense::route('/create'),
-            'edit' => Pages\EditOperationalExpense::route('/{record}/edit'),
+            // Página de edición eliminada - Los gastos operativos NO se pueden editar
+            // Solo se pueden ver (ViewAction) y eliminar (DeleteAction)
         ];
     }
 }
