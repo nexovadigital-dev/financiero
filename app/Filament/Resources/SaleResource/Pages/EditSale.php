@@ -13,9 +13,11 @@ class EditSale extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [
-            // BOTÓN REEMBOLSAR - Solo para ventas de créditos no reembolsadas
-            Actions\Action::make('refund')
+        $actions = [];
+
+        // BOTÓN REEMBOLSAR - Solo para ventas de créditos no reembolsadas
+        if ($this->record->canBeRefunded()) {
+            $actions[] = Actions\Action::make('refund')
                 ->label('Reembolsar Transacción')
                 ->icon('heroicon-o-arrow-uturn-left')
                 ->color('warning')
@@ -44,11 +46,12 @@ class EditSale extends EditRecord
                             ->body('Esta venta no puede ser reembolsada.')
                             ->send();
                     }
-                })
-                ->visible(fn () => $this->record->canBeRefunded()),
+                });
+        }
 
-            // BOTÓN ANULAR - Para todas las ventas que no estén canceladas
-            Actions\Action::make('cancel')
+        // BOTÓN ANULAR - Para todas las ventas que no estén canceladas
+        if ($this->record->status !== 'cancelled') {
+            $actions[] = Actions\Action::make('cancel')
                 ->label('Anular Venta')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
@@ -56,14 +59,18 @@ class EditSale extends EditRecord
                 ->modalHeading('Anular Venta')
                 ->modalDescription(function () {
                     $sale = $this->record;
-                    return "⚠️ ADVERTENCIA: Esta acción:\n\n" .
-                        "• Eliminará la ganancia de esta venta ($" . number_format($sale->amount_usd, 2) . " USD) de los reportes\n" .
-                        ($sale->supplier_id && $sale->supplier
-                            ? "• Devolverá el crédito al proveedor {$sale->supplier->name}\n"
-                            : "") .
-                        "• Marcará la venta como Cancelada\n" .
+                    $message = "⚠️ ADVERTENCIA: Esta acción:\n\n" .
+                        "• Eliminará la ganancia de esta venta ($" . number_format($sale->amount_usd, 2) . " USD) de los reportes\n";
+
+                    if ($sale->supplier_id && $sale->supplier) {
+                        $message .= "• Devolverá el crédito al proveedor {$sale->supplier->name}\n";
+                    }
+
+                    $message .= "• Marcará la venta como Cancelada\n" .
                         "• Esta acción NO se puede revertir\n\n" .
                         "¿Está seguro que desea anular esta venta?";
+
+                    return $message;
                 })
                 ->modalSubmitActionLabel('Sí, anular venta')
                 ->action(function () {
@@ -106,13 +113,15 @@ class EditSale extends EditRecord
                         ->send();
 
                     return redirect()->route('filament.admin.resources.sales.index');
-                })
-                ->visible(fn () => $this->record->status !== 'cancelled'),
+                });
+        }
 
-            // BOTÓN ELIMINAR - Solo para ventas NO de créditos o sin proveedor
-            Actions\DeleteAction::make()
-                ->visible(fn () => !$this->record->isProviderCredit() || $this->record->without_supplier),
-        ];
+        // BOTÓN ELIMINAR - Solo para ventas NO de créditos o sin proveedor
+        if (!$this->record->isProviderCredit() || $this->record->without_supplier) {
+            $actions[] = Actions\DeleteAction::make();
+        }
+
+        return $actions;
     }
 
     protected function mutateFormDataBeforeFill(array $data): array
