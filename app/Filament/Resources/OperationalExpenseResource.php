@@ -60,33 +60,36 @@ class OperationalExpenseResource extends Resource
                             ->maxLength(1000)
                             ->columnSpanFull(),
 
+                        Forms\Components\Select::make('payment_method_id')
+                            ->label('Método de Pago')
+                            ->relationship(
+                                name: 'paymentMethod',
+                                titleAttribute: 'name',
+                                modifyQueryUsing: fn ($query) => $query->where('is_active', true)->orderBy('name')
+                            )
+                            ->required()
+                            ->native(false)
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(function ($state, Forms\Set $set) {
+                                if ($state) {
+                                    $paymentMethod = \App\Models\PaymentMethod::find($state);
+                                    if ($paymentMethod) {
+                                        $set('currency', $paymentMethod->currency);
+                                    }
+                                }
+                            })
+                            ->helperText('Seleccione cómo pagó este gasto')
+                            ->columnSpanFull(),
+
                         Forms\Components\Grid::make(2)
                             ->schema([
-                                Forms\Components\Select::make('payment_method_id')
-                                    ->label('Método de Pago')
-                                    ->relationship('paymentMethod', 'name')
-                                    ->required()
-                                    ->native(false)
-                                    ->preload()
-                                    ->live()
-                                    ->afterStateUpdated(function ($state, Forms\Set $set) {
-                                        if ($state) {
-                                            $paymentMethod = \App\Models\PaymentMethod::find($state);
-                                            if ($paymentMethod) {
-                                                $set('currency', $paymentMethod->currency);
-                                            }
-                                        }
-                                    })
-                                    ->helperText('Seleccione cómo pagó este gasto'),
-
                                 Forms\Components\TextInput::make('payment_reference')
                                     ->label('Referencia de Pago')
                                     ->placeholder('Ej: Transfer-12345, Factura #678')
                                     ->maxLength(100),
-                            ]),
 
-                        Forms\Components\Grid::make(2)
-                            ->schema([
                                 Forms\Components\Select::make('currency')
                                     ->label('Moneda')
                                     ->options(function () {
@@ -100,26 +103,27 @@ class OperationalExpenseResource extends Resource
                                     ->native(false)
                                     ->disabled() // Se define automáticamente por el método de pago
                                     ->dehydrated()
-                                    ->helperText('✓ Moneda del método de pago seleccionado'),
-
-                                Forms\Components\TextInput::make('amount')
-                                    ->label('Monto Pagado')
-                                    ->numeric()
-                                    ->prefix(function (Get $get) {
-                                        $currency = $get('currency');
-                                        return match($currency) {
-                                            'NIO' => 'C$',
-                                            'USD' => '$',
-                                            'USDT' => '$',
-                                            default => '$',
-                                        };
-                                    })
-                                    ->required()
-                                    ->minValue(0.01)
-                                    ->step(0.01)
-                                    ->placeholder('0.00')
-                                    ->helperText('💸 Cantidad que pagó por este gasto'),
+                                    ->helperText('✓ Auto-detectado del método de pago'),
                             ]),
+
+                        Forms\Components\TextInput::make('amount')
+                            ->label('Monto Pagado')
+                            ->numeric()
+                            ->prefix(function (Get $get) {
+                                $currency = $get('currency');
+                                return match($currency) {
+                                    'NIO' => 'C$',
+                                    'USD' => '$',
+                                    'USDT' => '$',
+                                    default => '$',
+                                };
+                            })
+                            ->required()
+                            ->minValue(0.01)
+                            ->step(0.01)
+                            ->placeholder('0.00')
+                            ->helperText('💸 Cantidad que pagó por este gasto')
+                            ->columnSpanFull(),
 
                         // Campos ocultos
                         Forms\Components\Hidden::make('expense_type')
