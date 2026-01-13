@@ -598,11 +598,14 @@ class SaleResource extends Resource
                         $count = $items->count() - 1;
                         return $firstName . " (+" . $count . " más)";
                     })
-                    ->searchable(query: function ($query, $search) {
-                        return $query->whereHas('items', function ($q) use ($search) {
-                            $q->where('product_name', 'like', "%{$search}%");
-                        });
-                    })
+                    ->searchable(
+                        query: function ($query, string $search) {
+                            return $query->whereHas('items', function ($q) use ($search) {
+                                $q->where('product_name', 'like', "%{$search}%");
+                            });
+                        },
+                        isIndividual: true
+                    )
                     ->limit(35)
                     ->wrap()
                     ->color('info'),
