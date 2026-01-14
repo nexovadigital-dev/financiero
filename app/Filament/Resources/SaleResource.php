@@ -602,6 +602,11 @@ class SaleResource extends Resource
                     ->wrap()
                     ->color('info'),
 
+                // Columna oculta para búsqueda de productos
+                Tables\Columns\TextColumn::make('items.product_name')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 // 5. Costo Base (precio base en USD)
                 Tables\Columns\TextColumn::make('base_cost_total')
                     ->label('Costo Base')
@@ -691,15 +696,6 @@ class SaleResource extends Resource
             ])
             ->defaultSort('created_at', 'desc')
             ->recordClasses(fn ($record) => $record->isRefunded() ? 'opacity-50 line-through' : null)
-            ->modifyQueryUsing(function ($query) {
-                $search = request()->input('tableSearch');
-                if ($search) {
-                    $query->orWhereHas('items', function ($q) use ($search) {
-                        $q->where('product_name', 'like', "%{$search}%");
-                    });
-                }
-                return $query;
-            })
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->hidden(fn ($record) => $record->status === 'cancelled'),
