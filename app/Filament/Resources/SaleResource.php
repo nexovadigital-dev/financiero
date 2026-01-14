@@ -600,8 +600,7 @@ class SaleResource extends Resource
                     })
                     ->limit(35)
                     ->wrap()
-                    ->color('info')
-                    ->searchable(),
+                    ->color('info'),
 
                 // 5. Costo Base (precio base en USD)
                 Tables\Columns\TextColumn::make('base_cost_total')
