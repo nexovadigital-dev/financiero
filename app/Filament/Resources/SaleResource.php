@@ -563,7 +563,14 @@ class SaleResource extends Resource
                 Tables\Columns\TextColumn::make('id')
                     ->label('# Orden')
                     ->sortable()
-                    ->searchable()
+                    ->searchable(query: function ($query, string $search): \Illuminate\Database\Eloquent\Builder {
+                        return $query->where(function ($q) use ($search) {
+                            $q->where('id', 'like', "%{$search}%")
+                              ->orWhereHas('items', function ($subQuery) use ($search) {
+                                  $subQuery->where('product_name', 'like', "%{$search}%");
+                              });
+                        });
+                    })
                     ->weight('bold')
                     ->color('primary'),
 
@@ -601,11 +608,6 @@ class SaleResource extends Resource
                     ->limit(35)
                     ->wrap()
                     ->color('info'),
-
-                // Columna oculta para búsqueda de productos (usa accessor product_names)
-                Tables\Columns\TextColumn::make('product_names')
-                    ->searchable()
-                    ->hidden(),
 
                 // 5. Costo Base (precio base en USD)
                 Tables\Columns\TextColumn::make('base_cost_total')
