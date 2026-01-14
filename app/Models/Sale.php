@@ -182,4 +182,13 @@ class Sale extends Model
             $q->where('product_name', 'like', '%' . $search . '%');
         });
     }
+
+    /**
+     * Accessor para obtener todos los nombres de productos concatenados
+     * Útil para búsqueda
+     */
+    public function getProductNamesAttribute(): string
+    {
+        return $this->items->pluck('product_name')->implode(' ');
+    }
 }
