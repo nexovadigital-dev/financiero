@@ -604,6 +604,7 @@ class SaleResource extends Resource
 
                 // Columna oculta para búsqueda de productos
                 Tables\Columns\TextColumn::make('product_search')
+                    ->getStateUsing(fn () => null)
                     ->searchable(query: function ($query, string $search): \Illuminate\Database\Eloquent\Builder {
                         return $query->whereHas('items', function ($q) use ($search) {
                             $q->where('product_name', 'like', "%{$search}%");
