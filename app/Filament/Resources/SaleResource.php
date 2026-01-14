@@ -603,9 +603,13 @@ class SaleResource extends Resource
                     ->color('info'),
 
                 // Columna oculta para búsqueda de productos
-                Tables\Columns\TextColumn::make('items.product_name')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('product_search')
+                    ->searchable(query: function ($query, string $search): \Illuminate\Database\Eloquent\Builder {
+                        return $query->whereHas('items', function ($q) use ($search) {
+                            $q->where('product_name', 'like', "%{$search}%");
+                        });
+                    })
+                    ->hidden(),
 
                 // 5. Costo Base (precio base en USD)
                 Tables\Columns\TextColumn::make('base_cost_total')
