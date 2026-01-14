@@ -172,4 +172,14 @@ class Sale extends Model
 
         return true;
     }
+
+    /**
+     * Scope para buscar ventas por nombre de producto
+     */
+    public function scopeSearchByProduct($query, string $search)
+    {
+        return $query->whereHas('items', function ($q) use ($search) {
+            $q->where('product_name', 'like', '%' . $search . '%');
+        });
+    }
 }

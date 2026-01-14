@@ -362,7 +362,8 @@ class Reportes extends Page implements HasForms, HasTable
                     ->sortable()
                     ->weight('bold')
                     ->size('sm')
-                    ->color('primary'),
+                    ->color('primary')
+                    ->url(fn ($record) => route('filament.admin.resources.sales.edit', ['record' => $record->id]), shouldOpenInNewTab: true),
 
                 Tables\Columns\TextColumn::make('sale_date')
                     ->label('Fecha')

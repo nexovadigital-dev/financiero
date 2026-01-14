@@ -598,14 +598,10 @@ class SaleResource extends Resource
                         $count = $items->count() - 1;
                         return $firstName . " (+" . $count . " más)";
                     })
-                    ->searchable(query: function ($query, string $search) {
-                        return $query->whereHas('items', function ($q) use ($search) {
-                            $q->where('product_name', 'like', "%{$search}%");
-                        });
-                    })
                     ->limit(35)
                     ->wrap()
-                    ->color('info'),
+                    ->color('info')
+                    ->searchable(),
 
                 // 5. Costo Base (precio base en USD)
                 Tables\Columns\TextColumn::make('base_cost_total')
